@@ -1,0 +1,15 @@
+{
+  "version": "1.0",
+  "extractedAt": "2026-06-15T08:40:22.759Z",
+  "courseName": "25秋-26春研究生《日语》",
+  "cookies": {
+    "sessionid": "your_session_id",
+    "csrftoken": "your_csrf_token",
+    "uv_id": "2874",
+    "university_id": "2874",
+    "xtbz": "ykt"
+  },
+  "headers": {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+  }
+}
