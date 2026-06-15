@@ -15,8 +15,10 @@ const DEFAULTS = {
   // 总结模式
   summarize: false,
   courseDir: process.env.RAIN_COURSE_DIR || undefined,
+  lessonDir: process.env.RAIN_LESSON_DIR || undefined,
   model: process.env.RAIN_MODEL || 'mimo-v2.5-pro',
   extractModel: process.env.RAIN_EXTRACT_MODEL || 'mimo-v2.5',
+  extractConcurrency: parseInt(process.env.RAIN_EXTRACT_CONCURRENCY, 10) || 2,
   apiKey: process.env.RAIN_API_KEY || 'tmp/mimo-apikey',
   forceSummary: false,
 };
@@ -67,11 +69,17 @@ function parseArgs(argv) {
       case '--course-dir':
         config.courseDir = args[++i];
         break;
+      case '--lesson-dir':
+        config.lessonDir = args[++i];
+        break;
       case '--model':
         config.model = args[++i];
         break;
       case '--extract-model':
         config.extractModel = args[++i];
+        break;
+      case '--extract-concurrency':
+        config.extractConcurrency = parseInt(args[++i], 10) || DEFAULTS.extractConcurrency;
         break;
       case '--api-key':
         config.apiKey = args[++i];
@@ -112,8 +120,10 @@ function showHelp() {
 总结选项:
   summarize                  进入总结模式
   --course-dir <dir>         已下载课程的目录路径
+  --lesson-dir <dir>         只总结指定课时目录（课程目录下的相对或绝对路径）
   --model <name>             总结模型 (默认: mimo-v2.5-pro)
   --extract-model <name>     图像提取模型 (默认: mimo-v2.5)
+  --extract-concurrency <n>  图像提取并发数 (默认: 2)
   --api-key <path|key>       MiMo API Key 文件路径或直接传入 key
   --force-summary            强制重新生成 review.md
   -h, --help                 显示帮助
@@ -121,7 +131,8 @@ function showHelp() {
 环境变量:
   RAIN_MANIFEST, RAIN_OUTPUT, RAIN_CONCURRENCY, RAIN_RETRY
   RAIN_COURSE, RAIN_COOKIES
-  RAIN_COURSE_DIR, RAIN_MODEL, RAIN_EXTRACT_MODEL, RAIN_API_KEY
+  RAIN_COURSE_DIR, RAIN_LESSON_DIR, RAIN_MODEL, RAIN_EXTRACT_MODEL
+  RAIN_EXTRACT_CONCURRENCY, RAIN_API_KEY
 `);
 }
 

@@ -70,7 +70,13 @@ node src/index.js --course "算法设计与分析" --cookies ./cookies.json --js
 生成复习大纲（下载完成后）：
 
 ```bash
+# 总结整门课程
 node src/index.js summarize --course-dir "downloads/算法设计与分析"
+
+# 只总结某一节课
+node src/index.js summarize \
+  --course-dir "downloads/算法设计与分析" \
+  --lesson-dir "downloads/算法设计与分析/2024-12-24_1318590613705012608_5.2 贪心法正确性证明（2）"
 ```
 
 ## 文档

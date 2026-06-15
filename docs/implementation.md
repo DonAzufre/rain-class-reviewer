@@ -95,24 +95,25 @@ Manifest 读取与校验：
 MiMo/OpenAI 兼容客户端封装：
 
 - `createClient(apiKey)`：创建 OpenAI 实例，固定 baseURL。
-- `extractFromImage(client, model, imageBase64)`：单图提取，返回结构化 JSON。
-- `summarizeNotes(client, model, notes[])`：汇总笔记并生成 Markdown。
+- `extractFromImage(client, model, imageBase64, mimeType, retry)`：单图提取，返回结构化 JSON，支持 429 重试。
+- `summarizeNotes(client, model, notes, retry)`：汇总笔记并生成 Markdown，支持 429 重试。
+- `callWithRetry(apiCall, retry)`：通用重试包装，对 429 进行指数退避。
 - `parseJsonResponse(content)`：处理 LLM 返回的 JSON 或 Markdown 代码块。
 
 ### `src/extract-notes.js`
 
 逐图笔记提取：
 
-- `findImageFiles(courseDir)`：递归扫描 `.jpg` 图片。
+- `findImageFiles(rootDir)`：递归扫描 `.jpg` 图片。
 - `readState(courseDir)` / `writeState(courseDir, state)`：维护 `extracted/state.json`。
-- `extractNotesFromCourse(options)`：逐页调用 LLM，保存 JSON，支持跳过已提取页面。
+- `extractNotesFromCourse(options)`：逐页调用 LLM，保存 JSON，支持 `lessonDir` 过滤、并发控制、跳过已提取页面。
 
 ### `src/summarize-course.js`
 
-课程级总结：
+课程级/课时级总结：
 
-- `findExtractedNotes(courseDir)`：读取所有提取出的 JSON 笔记。
-- `summarizeCourse(options)`：调用 LLM 生成 `review.md`，支持跳过已存在文件。
+- `findExtractedNotes(courseDir, lessonPrefix)`：读取提取出的 JSON 笔记，可按课时前缀过滤。
+- `summarizeCourse(options)`：调用 LLM 生成 `review.md`；若指定 `lessonDir`，则输出到该课时目录下。
 
 ## 错误处理策略
 

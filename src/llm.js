@@ -1,12 +1,46 @@
 import OpenAI from 'openai';
 
 const BASE_URL = 'https://token-plan-cn.xiaomimimo.com/v1';
+const DEFAULT_RETRIES = 3;
 
 export function createClient(apiKey) {
   return new OpenAI({
     apiKey,
     baseURL: BASE_URL,
   });
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isRateLimitError(err) {
+  return err?.status === 429 || err?.code === 'rate_limit_exceeded';
+}
+
+async function callWithRetry(apiCall, retry = DEFAULT_RETRIES) {
+  let lastError;
+
+  for (let attempt = 0; attempt <= retry; attempt++) {
+    try {
+      return await apiCall();
+    } catch (err) {
+      lastError = err;
+
+      if (isRateLimitError(err)) {
+        // 429 退避：1s, 2s, 4s... 并加上随机抖动
+        const delay = Math.min(1000 * 2 ** attempt, 30000) + Math.random() * 500;
+        console.warn(`遇到 MiMo 限流 (429)，等待 ${Math.round(delay)}ms 后重试 (${attempt + 1}/${retry + 1})...`);
+        await sleep(delay);
+        continue;
+      }
+
+      // 非 429 错误直接抛出
+      throw err;
+    }
+  }
+
+  throw lastError;
 }
 
 function buildImageContent(base64, mimeType = 'image/jpeg') {
@@ -61,8 +95,8 @@ JSON 格式：
   "pageType": "content"
 }`;
 
-export async function extractFromImage(client, model, imageBase64, mimeType = 'image/jpeg') {
-  const response = await client.chat.completions.create({
+export async function extractFromImage(client, model, imageBase64, mimeType = 'image/jpeg', retry = DEFAULT_RETRIES) {
+  const response = await callWithRetry(() => client.chat.completions.create({
     model,
     messages: [
       {
@@ -74,7 +108,7 @@ export async function extractFromImage(client, model, imageBase64, mimeType = 'i
       },
     ],
     temperature: 0.1,
-  });
+  }), retry);
 
   const content = response.choices[0]?.message?.content;
   return parseJsonResponse(content);
@@ -99,10 +133,10 @@ const SUMMARY_PROMPT = `你是一名课程复习大纲生成专家。下面是�
 ## 第二章 xxx
 ...`;
 
-export async function summarizeNotes(client, model, notes) {
+export async function summarizeNotes(client, model, notes, retry = DEFAULT_RETRIES) {
   const notesText = JSON.stringify(notes, null, 2);
 
-  const response = await client.chat.completions.create({
+  const response = await callWithRetry(() => client.chat.completions.create({
     model,
     messages: [
       {
@@ -115,7 +149,7 @@ export async function summarizeNotes(client, model, notes) {
       },
     ],
     temperature: 0.3,
-  });
+  }), retry);
 
   const content = response.choices[0]?.message?.content;
   if (!content) {

@@ -10,7 +10,7 @@ function imagePathToKey(courseDir, imagePath) {
   return path.relative(courseDir, imagePath).replace(/\\/g, '/');
 }
 
-export async function findImageFiles(courseDir) {
+export async function findImageFiles(rootDir) {
   const images = [];
 
   async function scan(dir) {
@@ -26,7 +26,7 @@ export async function findImageFiles(courseDir) {
     }
   }
 
-  await scan(courseDir);
+  await scan(rootDir);
   return images.sort();
 }
 
@@ -59,12 +59,22 @@ function outputPathForImage(courseDir, imagePath) {
 export async function extractNotesFromCourse({
   client,
   courseDir,
+  lessonDir,
   extractModel = 'mimo-v2.5',
   force = false,
-  concurrency = 3,
+  concurrency = 2,
   onProgress,
 }) {
-  const images = await findImageFiles(courseDir);
+  const scanDir = path.resolve(lessonDir || courseDir);
+  const allImages = await findImageFiles(scanDir);
+
+  // 如果指定了 lessonDir，只保留该目录下的图片
+  let images = allImages;
+  if (lessonDir) {
+    const resolvedLesson = path.resolve(lessonDir);
+    images = allImages.filter((p) => p.startsWith(resolvedLesson + path.sep));
+  }
+
   const state = await readState(courseDir);
   const results = [];
 

@@ -50,7 +50,8 @@ node src/index.js --manifest ./manifest.json
 | `--course <name>` | 工具模式：按课程名严格匹配 | 与 `--manifest` 二选一 |
 | `--cookies <path>` | 工具模式：Cookie JSON 文件路径 | 工具模式必填 |
 | `--output <dir>` | 输出根目录 | `downloads` |
-| `--concurrency <n>` | 并发下载/提取数 | 3 |
+| `--concurrency <n>` | 并发下载数 | 3 |
+| `--extract-concurrency <n>` | 图像提取并发数 | 2 |
 | `--retry <n>` | 单张图片失败重试次数 | 3 |
 | `--force` | 强制重新下载已存在课时 | false |
 | `--json` | 输出 JSON 结果 | false |
@@ -167,22 +168,30 @@ node src/index.js summarize --course-dir "downloads/算法设计与分析"
 |------|------|--------|
 | `summarize` | 子命令，进入总结模式 | - |
 | `--course-dir <dir>` | 已下载课程的目录路径 | `RAIN_COURSE_DIR` |
+| `--lesson-dir <dir>` | 只总结课程下的某一课时目录 | `RAIN_LESSON_DIR` |
 | `--model <name>` | 总结模型 | `mimo-v2.5-pro` |
 | `--extract-model <name>` | 图像提取模型 | `mimo-v2.5` |
+| `--extract-concurrency <n>` | 图像提取并发数，遇到 429 可适当降低 | 2 |
 | `--api-key <path\|key>` | MiMo API Key 文件路径或直接传入 key | `tmp/mimo-apikey` |
 | `--force-summary` | 强制重新生成 `review.md` | false |
 
 示例：
 
 ```bash
-# 使用默认配置
+# 总结整门课程
 node src/index.js summarize --course-dir "downloads/算法设计与分析"
 
-# 指定模型和 API Key
+# 只总结某一节课
+node src/index.js summarize \
+  --course-dir "downloads/算法设计与分析" \
+  --lesson-dir "downloads/算法设计与分析/2024-12-24_1318590613705012608_5.2 贪心法正确性证明（2）"
+
+# 指定模型、降低并发避免限流
 node src/index.js summarize \
   --course-dir "downloads/算法设计与分析" \
   --model mimo-v2.5-pro \
   --extract-model mimo-v2.5 \
+  --extract-concurrency 1 \
   --api-key ./my-mimo-key.txt
 
 # 强制重新提取并总结

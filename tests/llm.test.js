@@ -2,13 +2,23 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { extractFromImage, summarizeNotes } from '../src/llm.js';
 
-function createFakeClient(responseContent) {
+function createFakeClient(responseContent, options = {}) {
+  const { fail429Times = 0 } = options;
+  let calls = 0;
   return {
     chat: {
       completions: {
-        create: async () => ({
-          choices: [{ message: { content: responseContent } }],
-        }),
+        create: async () => {
+          calls++;
+          if (calls <= fail429Times) {
+            const err = new Error('Rate limit exceeded');
+            err.status = 429;
+            throw err;
+          }
+          return {
+            choices: [{ message: { content: responseContent } }],
+          };
+        },
       },
     },
   };
@@ -61,6 +71,21 @@ describe('llm', () => {
     await assert.rejects(
       () => summarizeNotes(client, 'mimo-v2.5-pro', [{ title: 'a' }]),
       /空内容/
+    );
+  });
+
+  it('should retry on 429 rate limit', async () => {
+    const note = { title: 'retry', bullets: [], pageType: 'content' };
+    const client = createFakeClient(JSON.stringify(note), { fail429Times: 1 });
+    const result = await extractFromImage(client, 'mimo-v2.5', 'base64', 'image/jpeg', 3);
+    assert.equal(result.title, 'retry');
+  });
+
+  it('should throw after exhausting 429 retries', async () => {
+    const client = createFakeClient('', { fail429Times: 5 });
+    await assert.rejects(
+      () => extractFromImage(client, 'mimo-v2.5', 'base64', 'image/jpeg', 2),
+      /Rate limit/
     );
   });
 });

@@ -22,6 +22,19 @@ describe('config summarize', () => {
     assert.equal(config.courseDir, path.resolve('/tmp/course'));
     assert.equal(config.model, 'mimo-v2.5-pro');
     assert.equal(config.extractModel, 'mimo-v2.5');
+    assert.equal(config.extractConcurrency, 2);
+  });
+
+  it('should parse lesson-dir and extract-concurrency', () => {
+    const lessonDir = path.resolve('/tmp/course/lesson1');
+    const config = loadConfig([
+      'node', 'index.js', 'summarize',
+      '--course-dir', '/tmp/course',
+      '--lesson-dir', lessonDir,
+      '--extract-concurrency', '1',
+    ]);
+    assert.equal(config.lessonDir, lessonDir);
+    assert.equal(config.extractConcurrency, 1);
   });
 
   it('should require course-dir in summarize mode', () => {

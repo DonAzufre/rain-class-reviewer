@@ -134,9 +134,10 @@ async function runSummarize(config) {
   const extractionReport = await extractNotesFromCourse({
     client,
     courseDir: config.courseDir,
+    lessonDir: config.lessonDir,
     extractModel: config.extractModel,
     force: config.force || config.forceSummary,
-    concurrency: config.concurrency,
+    concurrency: config.extractConcurrency,
     onProgress: ({ current, total, relKey, skipped, error }) => {
       const status = error ? '失败' : skipped ? '跳过' : '完成';
       console.log(`[${current}/${total}] ${status} ${relKey}${error ? `: ${error}` : ''}`);
@@ -149,6 +150,7 @@ async function runSummarize(config) {
   const summaryReport = await summarizeCourse({
     client,
     courseDir: config.courseDir,
+    lessonDir: config.lessonDir,
     model: config.model,
     force: config.forceSummary,
   });

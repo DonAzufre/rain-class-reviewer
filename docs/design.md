@@ -110,16 +110,17 @@ interface Manifest {
 
 ### 阶段 1：逐图提取
 
-- 输入：课程目录下的所有 `.jpg` 图片。
+- 输入：课程目录或指定课时目录下的所有 `.jpg` 图片。
 - 模型：`mimo-v2.5`（性价比高，适合单图 OCR + 结构化）。
 - 输出：每张图片对应一个 JSON 文件，包含 `title`、`bullets`、`formulas`、`keywords`、`concepts`、`summary`、`pageType`。
 - 状态：`extracted/state.json` 记录每页处理状态，支持中断恢复。
+- 限流：遇到 MiMo 429 错误时自动指数退避重试。
 
 ### 阶段 2：去重总结
 
-- 输入：所有提取出的结构化笔记。
+- 输入：所有提取出的结构化笔记，或仅 `--lesson-dir` 指定课时的笔记。
 - 模型：`mimo-v2.5-pro`（更强的综合能力，适合跨页面去重与主题聚类）。
-- 输出：课程级 `review.md`，按章节组织，突出定义、定理、算法、例题和易错点。
+- 输出：课程级 `{courseDir}/review.md`，或课时级 `{lessonDir}/review.md`。
 
 ## 接口策略
 
