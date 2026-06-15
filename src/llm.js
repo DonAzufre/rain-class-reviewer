@@ -1,0 +1,126 @@
+import OpenAI from 'openai';
+
+const BASE_URL = 'https://token-plan-cn.xiaomimimo.com/v1';
+
+export function createClient(apiKey) {
+  return new OpenAI({
+    apiKey,
+    baseURL: BASE_URL,
+  });
+}
+
+function buildImageContent(base64, mimeType = 'image/jpeg') {
+  return {
+    type: 'image_url',
+    image_url: {
+      url: `data:${mimeType};base64,${base64}`,
+    },
+  };
+}
+
+function parseJsonResponse(content) {
+  if (!content) {
+    throw new Error('LLM 返回空内容');
+  }
+
+  // 尝试直接解析
+  try {
+    return JSON.parse(content);
+  } catch {
+    // 尝试从 Markdown 代码块中提取
+    const match = content.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+    if (match) {
+      try {
+        return JSON.parse(match[1]);
+      } catch {
+        // fall through
+      }
+    }
+  }
+
+  throw new Error(`LLM 返回非 JSON: ${content.slice(0, 200)}`);
+}
+
+const EXTRACTION_PROMPT = `你是一名优秀的课程笔记整理助手。请仔细识别这张幻灯片中的所有信息，并输出为严格合法的 JSON。
+
+要求：
+1. 提取所有可见文字，包括标题、正文、公式、代码、标注。
+2. 若包含图表，描述图表类型和关键数据/趋势。
+3. 识别页面类型：cover（封面）、content（正文）、formula（公式推导）、diagram（图表）、summary（总结）、exercise（例题/练习）、unknown（未知）。
+4. 用中文输出。
+5. 输出必须且只能是 JSON，不要任何解释。
+
+JSON 格式：
+{
+  "title": "幻灯片标题（若无则为空字符串）",
+  "bullets": ["要点1", "要点2", ...],
+  "formulas": ["公式1", ...],
+  "keywords": ["关键词1", ...],
+  "concepts": ["核心概念1", ...],
+  "summary": "用1-3句话概括本页核心内容",
+  "pageType": "content"
+}`;
+
+export async function extractFromImage(client, model, imageBase64, mimeType = 'image/jpeg') {
+  const response = await client.chat.completions.create({
+    model,
+    messages: [
+      {
+        role: 'user',
+        content: [
+          { type: 'text', text: EXTRACTION_PROMPT },
+          buildImageContent(imageBase64, mimeType),
+        ],
+      },
+    ],
+    temperature: 0.1,
+  });
+
+  const content = response.choices[0]?.message?.content;
+  return parseJsonResponse(content);
+}
+
+const SUMMARY_PROMPT = `你是一名课程复习大纲生成专家。下面是一系列幻灯片提取出的结构化笔记，请跨页面去重、整合，生成一份完整的 Markdown 复习大纲。
+
+要求：
+1. 按课程主题/章节组织层级结构。
+2. 合并重复概念，保留不同角度的解释和示例。
+3. 突出定义、定理、算法、例题、易错点。
+4. 使用中文。
+5. 输出纯 Markdown，不要代码块包裹。
+
+输出格式示例：
+# 课程复习大纲
+
+## 第一章 xxx
+### 1.1 xxx
+- 要点...
+
+## 第二章 xxx
+...`;
+
+export async function summarizeNotes(client, model, notes) {
+  const notesText = JSON.stringify(notes, null, 2);
+
+  const response = await client.chat.completions.create({
+    model,
+    messages: [
+      {
+        role: 'system',
+        content: SUMMARY_PROMPT,
+      },
+      {
+        role: 'user',
+        content: `以下是幻灯片提取笔记：\n\n${notesText}`,
+      },
+    ],
+    temperature: 0.3,
+  });
+
+  const content = response.choices[0]?.message?.content;
+  if (!content) {
+    throw new Error('总结模型返回空内容');
+  }
+
+  return content;
+}

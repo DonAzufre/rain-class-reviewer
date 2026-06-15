@@ -47,6 +47,23 @@
 │  下载层 (download)│───▶│ 图片 CDN        │
 │ 并发下载图片     │     │ yuketang.cn     │
 └─────────────────┘     └─────────────────┘
+         │
+         ▼
+┌─────────────────┐     ┌─────────────────┐
+│  笔记提取层      │────▶│  MiMo API       │
+│ (extract-notes) │     │  mimo-v2.5      │
+└─────────────────┘     └─────────────────┘
+         │
+         ▼
+┌─────────────────┐     ┌─────────────────┐
+│  总结层          │────▶│  MiMo API       │
+│(summarize-course)│     │ mimo-v2.5-pro   │
+└─────────────────┘     └─────────────────┘
+         │
+         ▼
+┌─────────────────┐
+│    review.md    │
+└─────────────────┘
 ```
 
 ## 核心数据模型
@@ -89,9 +106,26 @@ interface Manifest {
 }
 ```
 
+## LLM 总结流程
+
+### 阶段 1：逐图提取
+
+- 输入：课程目录下的所有 `.jpg` 图片。
+- 模型：`mimo-v2.5`（性价比高，适合单图 OCR + 结构化）。
+- 输出：每张图片对应一个 JSON 文件，包含 `title`、`bullets`、`formulas`、`keywords`、`concepts`、`summary`、`pageType`。
+- 状态：`extracted/state.json` 记录每页处理状态，支持中断恢复。
+
+### 阶段 2：去重总结
+
+- 输入：所有提取出的结构化笔记。
+- 模型：`mimo-v2.5-pro`（更强的综合能力，适合跨页面去重与主题聚类）。
+- 输出：课程级 `review.md`，按章节组织，突出定义、定理、算法、例题和易错点。
+
 ## 接口策略
 
-### 新版接口（推荐）
+### 雨课堂接口
+
+#### 新版接口（推荐）
 
 1. `GET /api/v3/lesson-summary/student?lesson_id={lessonId}`
    - 返回该课时的所有 PPT 元数据 `presentations[]`。
@@ -101,7 +135,7 @@ interface Manifest {
    - 返回单个 PPT 的全部幻灯片 `slides[].cover`。
    - 包含未在课堂中展示过的页面。
 
-### 旧版接口（回退）
+#### 旧版接口（回退）
 
 1. `GET /api/v3/classroom-report/student/review?lesson_id={lessonId}`
    - 返回课堂中实际展示过的幻灯片时间线。
@@ -109,6 +143,12 @@ interface Manifest {
 
 2. `GET /api/v3/classroom-report/student/detail?lesson_id={lessonId}`
    - 获取课件总页数，用于输出「仅展示部分页面」的警告。
+
+### MiMo 接口
+
+- Base URL: `https://token-plan-cn.xiaomimimo.com/v1`
+- 协议：OpenAI 兼容 API
+- 推荐模型：`mimo-v2.5`（提取）、`mimo-v2.5-pro`（总结）
 
 ## 目录设计
 

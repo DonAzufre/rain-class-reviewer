@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { loadConfig } from './config.js';
+import { loadConfig, loadApiKey } from './config.js';
 import { readManifest, validateAndNormalize, cookieString } from './manifest.js';
 import { downloadImage, runWithConcurrency } from './download.js';
 import { extractLessonImages } from './extract.js';
@@ -14,6 +14,9 @@ import {
 } from './organize.js';
 import { isLessonDownloaded } from './state.js';
 import { buildReport, printReport } from './report.js';
+import { createClient } from './llm.js';
+import { extractNotesFromCourse } from './extract-notes.js';
+import { summarizeCourse } from './summarize-course.js';
 import path from 'node:path';
 import { readFileSync } from 'node:fs';
 
@@ -31,8 +34,7 @@ function buildToolManifest(config) {
   });
 }
 
-async function main() {
-  const config = loadConfig();
+async function runDownload(config) {
   const manifest = config.manifest
     ? readManifest(config.manifest)
     : buildToolManifest(config);
@@ -121,10 +123,59 @@ async function main() {
   printReport(report, config.json);
 
   const hasFailures = report.summary.failedImages > 0;
-  process.exit(hasFailures ? 1 : 0);
+  return { hasFailures, report };
+}
+
+async function runSummarize(config) {
+  const apiKey = loadApiKey(config);
+  const client = createClient(apiKey);
+
+  console.log(`开始提取笔记: ${config.courseDir}`);
+  const extractionReport = await extractNotesFromCourse({
+    client,
+    courseDir: config.courseDir,
+    extractModel: config.extractModel,
+    force: config.force || config.forceSummary,
+    concurrency: config.concurrency,
+    onProgress: ({ current, total, relKey, skipped, error }) => {
+      const status = error ? '失败' : skipped ? '跳过' : '完成';
+      console.log(`[${current}/${total}] ${status} ${relKey}${error ? `: ${error}` : ''}`);
+    },
+  });
+
+  console.log(`\n提取完成: 成功 ${extractionReport.success}/${extractionReport.total}, 失败 ${extractionReport.failed}`);
+
+  console.log('\n开始生成复习大纲...');
+  const summaryReport = await summarizeCourse({
+    client,
+    courseDir: config.courseDir,
+    model: config.model,
+    force: config.forceSummary,
+  });
+
+  if (summaryReport.skipped) {
+    console.log(`复习大纲已存在，已跳过: ${summaryReport.reviewPath}`);
+  } else {
+    console.log(`复习大纲已生成: ${summaryReport.reviewPath} (基于 ${summaryReport.noteCount} 页笔记)`);
+  }
+
+  return { hasFailures: extractionReport.failed > 0, extractionReport, summaryReport };
+}
+
+async function main() {
+  const config = loadConfig();
+
+  if (config.summarize) {
+    const { hasFailures } = await runSummarize(config);
+    process.exitCode = hasFailures ? 1 : 0;
+    return;
+  }
+
+  const { hasFailures } = await runDownload(config);
+  process.exitCode = hasFailures ? 1 : 0;
 }
 
 main().catch((err) => {
   console.error(`错误: ${err.message}`);
-  process.exit(1);
+  process.exitCode = 1;
 });

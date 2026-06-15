@@ -67,6 +67,12 @@ node src/index.js --course "算法设计与分析" --cookies ./cookies.json --fo
 node src/index.js --course "算法设计与分析" --cookies ./cookies.json --json
 ```
 
+生成复习大纲（下载完成后）：
+
+```bash
+node src/index.js summarize --course-dir "downloads/算法设计与分析"
+```
+
 ## 文档
 
 - [使用指南](docs/usage.md)：CLI 参数、环境变量、Manifest 格式、输出目录结构。
