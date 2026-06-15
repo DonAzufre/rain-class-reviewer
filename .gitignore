@@ -33,3 +33,9 @@ yarn-error.log*
 
 # Session / export files
 kimi-export-*.md
+
+# Agent skill test installations
+.claude/
+.opencode/
+.agents/
+.skills-lock.json

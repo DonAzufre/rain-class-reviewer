@@ -1,0 +1,9 @@
+interface:
+  display_name: 雨课堂复习助手
+  short_description: 从长江雨课堂下载课程 PPT 并生成 Markdown 复习大纲
+  brand_color: "#3B82F6"
+
+dependencies:
+  tools:
+    - type: "bash"
+      description: "Node.js runtime and npm"

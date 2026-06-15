@@ -10,6 +10,21 @@
 - 支持按日期、课时 ID 等条件指定下载范围。
 - 断点续传：已下载课时自动跳过，支持 `--force` 强制重下。
 
+## 作为 Agent Skill 安装
+
+本仓库遵循开放的 [Agent Skills](https://agentskills.io) 格式，可直接安装到 Claude Code、OpenCode 等支持 Skill 的 Agent：
+
+```bash
+npx skills add DonAzufre/rain-class-reviewer
+```
+
+安装后，在 Agent 中输入类似以下指令即可触发：
+
+```text
+帮我下载长江雨课堂的计算机网络课件
+帮我总结工程伦理概论的复习大纲
+```
+
 ## 快速开始
 
 ### 安装
@@ -42,7 +57,9 @@ node src/index.js --course "工程伦理概论" --cookies ./cookies.json
 
 ### Agent / Skill 模式
 
-让 Agent 通过 Chrome DevTools MCP 读取登录态 Cookie，生成 Manifest 后调用工具：
+Agent 可通过本项目的 `SKILL.md` 自动加载工作流。首次调用时，Agent 会运行 `scripts/bootstrap.js` 自动安装依赖并调用 CLI。
+
+手动使用 Manifest：
 
 ```bash
 node src/index.js --manifest ./manifest.json
