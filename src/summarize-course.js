@@ -1,9 +1,10 @@
 import { readdir, readFile, writeFile, access, mkdir } from 'node:fs/promises';
 import path from 'node:path';
-import { summarizeNotes } from './llm.js';
+import { summarizeNotes, callWithRetry } from './llm.js';
 
 const EXTRACTED_DIR = 'extracted';
 const REVIEW_FILE = 'review.md';
+const DEFAULT_CHUNK_SIZE = 60;
 
 export async function findExtractedNotes(courseDir, lessonPrefix = '') {
   const notesDir = path.join(courseDir, EXTRACTED_DIR);
@@ -87,9 +88,66 @@ export async function summarizeCourse({
     throw new Error(`未在 ${location} 下找到提取笔记，请先执行提取阶段`);
   }
 
-  const markdown = await summarizeNotes(client, model, notes);
+  const markdown = await summarizeNotesInChunks(client, model, notes, DEFAULT_CHUNK_SIZE);
   await mkdir(path.dirname(reviewPath), { recursive: true });
   await writeFile(reviewPath, markdown, 'utf-8');
 
   return { reviewPath, skipped: false, noteCount: notes.length };
+}
+
+async function summarizeNotesInChunks(client, model, notes, chunkSize) {
+  if (notes.length <= chunkSize) {
+    return summarizeNotes(client, model, notes);
+  }
+
+  console.log(`笔记共 ${notes.length} 页，超过 ${chunkSize} 页，将分块总结...`);
+
+  const chunks = [];
+  for (let i = 0; i < notes.length; i += chunkSize) {
+    chunks.push(notes.slice(i, i + chunkSize));
+  }
+
+  const intermediateSummaries = [];
+  for (let i = 0; i < chunks.length; i++) {
+    console.log(`  总结第 ${i + 1}/${chunks.length} 块 (${chunks[i].length} 页)...`);
+    const summary = await summarizeNotes(client, model, chunks[i]);
+    intermediateSummaries.push(summary);
+  }
+
+  console.log('  合并各块摘要...');
+  return mergeSummaries(client, model, intermediateSummaries);
+}
+
+async function mergeSummaries(client, model, summaries) {
+  const combined = summaries.join('\n\n---\n\n');
+  const messages = [
+    {
+      role: 'system',
+      content: `你是一名课程复习大纲整理专家。下面是一份课程各部分的中间摘要，请整合为一份完整、连贯、去重的 Markdown 复习大纲。
+
+要求：
+1. 按主题/章节组织层级结构。
+2. 合并重复概念，保留不同角度的解释和示例。
+3. 突出定义、定理、算法、例题、易错点。
+4. 使用中文。
+5. 输出纯 Markdown，不要代码块包裹。`,
+    },
+    {
+      role: 'user',
+      content: `以下是各块中间摘要：\n\n${combined}`,
+    },
+  ];
+
+  const response = await callWithRetry(() => client.chat.completions.create({
+    model,
+    messages,
+    temperature: 0.3,
+  }));
+
+  const content = response.choices[0]?.message?.content;
+  if (!content) {
+    throw new Error('合并总结模型返回空内容');
+  }
+
+  return content;
 }

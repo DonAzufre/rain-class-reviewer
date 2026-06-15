@@ -7,6 +7,7 @@
 - 自动发现课程与课时，支持一次课堂多个 PPT。
 - 保留同一天多次课堂活动，不再按日期合并。
 - 优先下载完整 PPT 幻灯片（含未在课堂展示的页面）。
+- 支持按日期、课时 ID 等条件指定下载范围。
 - 断点续传：已下载课时自动跳过，支持 `--force` 强制重下。
 
 ## 快速开始
@@ -65,6 +66,25 @@ node src/index.js --course "算法设计与分析" --cookies ./cookies.json --fo
 
 ```bash
 node src/index.js --course "算法设计与分析" --cookies ./cookies.json --json
+```
+
+只下载最新一次课：
+
+```bash
+node src/index.js --course "算法设计与分析" --cookies ./cookies.json --latest
+```
+
+下载指定日期之后的课：
+
+```bash
+node src/index.js --course "算法设计与分析" --cookies ./cookies.json --since 2026-06-01
+```
+
+下载指定课时：
+
+```bash
+node src/index.js --course "算法设计与分析" --cookies ./cookies.json \
+  --lesson-id 1318590613705012608
 ```
 
 生成复习大纲（下载完成后）：

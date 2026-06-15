@@ -12,6 +12,13 @@ const DEFAULTS = {
   course: process.env.RAIN_COURSE || undefined,
   cookies: process.env.RAIN_COOKIES || undefined,
 
+  // 课时过滤
+  since: process.env.RAIN_SINCE || undefined,
+  until: process.env.RAIN_UNTIL || undefined,
+  latest: process.env.RAIN_LATEST === '1' || process.env.RAIN_LATEST === 'true',
+  lessonIds: process.env.RAIN_LESSON_ID ? process.env.RAIN_LESSON_ID.split(',').map((s) => s.trim()).filter(Boolean) : [],
+  lessonDates: process.env.RAIN_LESSON_DATE ? process.env.RAIN_LESSON_DATE.split(',').map((s) => s.trim()).filter(Boolean) : [],
+
   // 总结模式
   summarize: false,
   courseDir: process.env.RAIN_COURSE_DIR || undefined,
@@ -66,6 +73,21 @@ function parseArgs(argv) {
       case '--cookies':
         config.cookies = args[++i];
         break;
+      case '--since':
+        config.since = args[++i];
+        break;
+      case '--until':
+        config.until = args[++i];
+        break;
+      case '--latest':
+        config.latest = true;
+        break;
+      case '--lesson-id':
+        config.lessonIds.push(args[++i]);
+        break;
+      case '--lesson-date':
+        config.lessonDates.push(args[++i]);
+        break;
       case '--course-dir':
         config.courseDir = args[++i];
         break;
@@ -116,6 +138,11 @@ function showHelp() {
   -j, --json                 输出 JSON 结果
   --course <name>            工具模式：按课程名严格匹配并自动发现
   --cookies <path>           工具模式：Cookie JSON 文件路径
+  --since <date>             只下载该日期及之后的课时 (YYYY-MM-DD)
+  --until <date>             只下载该日期及之前的课时 (YYYY-MM-DD)
+  --latest                   只下载最新一次课时
+  --lesson-id <id>           只下载指定 lessonId（可多次使用）
+  --lesson-date <date>       只下载指定日期的课时（可多次使用）
 
 总结选项:
   summarize                  进入总结模式
@@ -131,6 +158,7 @@ function showHelp() {
 环境变量:
   RAIN_MANIFEST, RAIN_OUTPUT, RAIN_CONCURRENCY, RAIN_RETRY
   RAIN_COURSE, RAIN_COOKIES
+  RAIN_SINCE, RAIN_UNTIL, RAIN_LATEST, RAIN_LESSON_ID, RAIN_LESSON_DATE
   RAIN_COURSE_DIR, RAIN_LESSON_DIR, RAIN_MODEL, RAIN_EXTRACT_MODEL
   RAIN_EXTRACT_CONCURRENCY, RAIN_API_KEY
 `);

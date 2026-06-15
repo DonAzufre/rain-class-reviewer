@@ -65,14 +65,18 @@ export async function extractNotesFromCourse({
   concurrency = 2,
   onProgress,
 }) {
-  const scanDir = path.resolve(lessonDir || courseDir);
+  const resolvedCourse = path.resolve(courseDir);
+  const scanDir = lessonDir ? path.resolve(lessonDir) : resolvedCourse;
   const allImages = await findImageFiles(scanDir);
 
   // 如果指定了 lessonDir，只保留该目录下的图片
   let images = allImages;
   if (lessonDir) {
     const resolvedLesson = path.resolve(lessonDir);
-    images = allImages.filter((p) => p.startsWith(resolvedLesson + path.sep));
+    images = allImages.filter((p) => {
+      const rel = path.relative(resolvedLesson, p);
+      return !rel.startsWith('..') && !path.isAbsolute(rel);
+    });
   }
 
   const state = await readState(courseDir);

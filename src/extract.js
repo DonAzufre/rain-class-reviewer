@@ -1,13 +1,10 @@
 import { cookieString } from './manifest.js';
+import { fetchJson, isAuthError } from './api-client.js';
 
 const REVIEW_API_BASE = 'https://changjiang.yuketang.cn/api/v3/classroom-report/student/review';
 const DETAIL_API_BASE = 'https://changjiang.yuketang.cn/api/v3/classroom-report/student/detail';
 const LESSON_SUMMARY_API = 'https://changjiang.yuketang.cn/api/v3/lesson-summary/student';
 const PRESENTATION_API = 'https://changjiang.yuketang.cn/api/v3/lesson-summary/student/presentation';
-
-function sleep(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
 
 export function buildApiHeaders(manifest, referer) {
   const cookies = manifest.cookies || {};
@@ -42,51 +39,6 @@ function buildV3Referer(manifest, lesson) {
   return `https://changjiang.yuketang.cn/v2/web/student-v3/${classroomId}/${lessonId}/${activityId}`;
 }
 
-async function fetchJson(url, options = {}, retry = 3) {
-  const { headers, body, method = 'GET' } = options;
-  let lastError;
-
-  for (let attempt = 0; attempt <= retry; attempt++) {
-    try {
-      const response = await fetch(url, {
-        method,
-        headers,
-        body,
-        redirect: 'follow',
-      });
-
-      const text = await response.text();
-      let data;
-      try {
-        data = JSON.parse(text);
-      } catch (err) {
-        throw new Error(`接口返回非 JSON: ${text.slice(0, 200)}`);
-      }
-
-      if (!response.ok) {
-        throw new Error(`接口 HTTP ${response.status}: ${data.msg || data.errmsg || response.statusText}`);
-      }
-
-      if (data.errcode !== undefined && data.errcode !== 0) {
-        throw new Error(`接口业务错误 [${data.errcode}]: ${data.errmsg || '未知错误'}`);
-      }
-
-      if (data.code !== undefined && data.code !== 0) {
-        throw new Error(`接口业务错误 [${data.code}]: ${data.msg || '未知错误'}`);
-      }
-
-      return data.data;
-    } catch (err) {
-      lastError = err;
-      if (attempt < retry) {
-        await sleep(Math.min(1000 * 2 ** attempt, 10000));
-      }
-    }
-  }
-
-  throw lastError;
-}
-
 export async function fetchLessonSummary(manifest, lesson, retry = 3) {
   const referer = buildV3Referer(manifest, lesson);
   const headers = buildApiHeaders(manifest, referer);
@@ -103,33 +55,52 @@ export async function fetchPresentation(manifest, lesson, presentationId, retry 
   return fetchJson(url, { headers }, retry);
 }
 
+function isFallbackError(err) {
+  if (isAuthError(err)) {
+    return false;
+  }
+
+  const message = err?.message || '';
+
+  // 新版接口不存在或课时无多 PPT 结构时回退
+  return /404|not found|未找到任何 PPT|接口业务错误 \[404\]|返回缺少 presentations|presentations.*为空/i.test(message);
+}
+
 export async function extractLessonPresentations(manifest, lesson, retry = 3) {
+  let summary;
   try {
-    const summary = await fetchLessonSummary(manifest, lesson, retry);
-    const presentations = summary?.presentations || [];
-
-    if (presentations.length === 0) {
-      throw new Error(`lesson ${lesson.lessonId} 未找到任何 PPT`);
-    }
-
-    const results = [];
-    for (const ppt of presentations) {
-      const data = await fetchPresentation(manifest, lesson, ppt.id, retry);
-      const images = data?.slides?.map((slide) => slide.cover).filter(Boolean) || [];
-      results.push({
-        presentationId: String(ppt.id),
-        title: ppt.title || '',
-        images,
-      });
-    }
-
-    return results;
+    summary = await fetchLessonSummary(manifest, lesson, retry);
   } catch (err) {
+    if (!isFallbackError(err)) {
+      throw err;
+    }
     console.warn(
       `lesson ${lesson.lessonId} 使用新版接口失败: ${err.message}，尝试回退到 review 接口（可能不完整）`
     );
     return extractLessonImagesAsPresentations(manifest, lesson, retry);
   }
+
+  const presentations = summary?.presentations || [];
+
+  if (presentations.length === 0) {
+    console.warn(
+      `lesson ${lesson.lessonId} 新版接口未返回 PPT，尝试回退到 review 接口（可能不完整）`
+    );
+    return extractLessonImagesAsPresentations(manifest, lesson, retry);
+  }
+
+  const results = [];
+  for (const ppt of presentations) {
+    const data = await fetchPresentation(manifest, lesson, ppt.id, retry);
+    const images = data?.slides?.map((slide) => slide.cover).filter(Boolean) || [];
+    results.push({
+      presentationId: String(ppt.id),
+      title: ppt.title || '',
+      images,
+    });
+  }
+
+  return results;
 }
 
 export function extractSlideUrls(timelineList) {

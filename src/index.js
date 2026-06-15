@@ -4,6 +4,7 @@ import { readManifest, validateAndNormalize, cookieString } from './manifest.js'
 import { downloadImage, runWithConcurrency } from './download.js';
 import { extractLessonImages } from './extract.js';
 import { discoverCourse } from './discover.js';
+import { filterLessons, buildLessonFilters, hasActiveLessonFilters } from './filter-lessons.js';
 import {
   getCourseDir,
   getLessonDir,
@@ -44,6 +45,20 @@ async function runDownload(config) {
     await discoverCourse(manifest, config.retry);
   }
 
+  const lessonFilters = buildLessonFilters(config);
+  if (hasActiveLessonFilters(lessonFilters)) {
+    const originalCount = manifest.lessons.length;
+    manifest.lessons = filterLessons(manifest.lessons, lessonFilters);
+
+    if (manifest.lessons.length === 0) {
+      throw new Error('过滤后没有匹配的课时，请检查 --since/--until/--lesson-id/--lesson-date 参数');
+    }
+
+    if (!config.json) {
+      console.log(`课时过滤: 从 ${originalCount} 个课时中匹配到 ${manifest.lessons.length} 个`);
+    }
+  }
+
   manifest.outputDir = getCourseDir(config.output, manifest.courseName);
   await ensureCourseMeta(manifest.outputDir, manifest);
 
@@ -76,6 +91,9 @@ async function runDownload(config) {
     }
 
     const allDownloadTasks = [];
+    let completedCount = 0;
+    const progressInterval = Math.max(1, Math.floor(totalImages / 10));
+
     for (const [pptIndex, ppt] of presentations.entries()) {
       const pptDir = getPresentationDir(lessonDir, lesson, ppt, pptIndex);
 
@@ -87,6 +105,11 @@ async function runDownload(config) {
           headers: manifest.headers,
           retry: config.retry,
         });
+
+        completedCount += 1;
+        if (!config.json && completedCount % progressInterval === 0) {
+          console.log(`  [${completedCount}/${totalImages}] 下载进度 ${lesson.title || lesson.lessonId}`);
+        }
 
         return {
           success: result.success,
@@ -100,6 +123,10 @@ async function runDownload(config) {
       });
 
       allDownloadTasks.push(...tasks);
+    }
+
+    if (!config.json && totalImages > 0) {
+      console.log(`开始下载: ${lesson.date} ${lesson.title} (${totalImages} 张图片)`);
     }
 
     const results = await runWithConcurrency(allDownloadTasks, config.concurrency);

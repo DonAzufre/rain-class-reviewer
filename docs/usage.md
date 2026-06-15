@@ -55,6 +55,47 @@ node src/index.js --manifest ./manifest.json
 | `--retry <n>` | 单张图片失败重试次数 | 3 |
 | `--force` | 强制重新下载已存在课时 | false |
 | `--json` | 输出 JSON 结果 | false |
+| `--since <date>` | 只下载该日期及之后的课时 | - |
+| `--until <date>` | 只下载该日期及之前的课时 | - |
+| `--latest` | 只下载最新一次课时 | false |
+| `--lesson-id <id>` | 只下载指定 lessonId（可多次使用） | - |
+| `--lesson-date <date>` | 只下载指定日期的课时（可多次使用） | - |
+
+## 指定课时下载
+
+无论是工具模式还是 Manifest 模式，都可以在下载阶段过滤课时：
+
+```bash
+# 只下载最新一次课
+node src/index.js --course "工程伦理概论" --cookies ./cookies.json --latest
+
+# 下载 2026-06-01 之后的所有课
+node src/index.js --course "工程伦理概论" --cookies ./cookies.json --since 2026-06-01
+
+# 下载 2026-05-01 到 2026-06-10 之间的课
+node src/index.js --course "工程伦理概论" --cookies ./cookies.json \
+  --since 2026-05-01 --until 2026-06-10
+
+# 下载指定 lessonId 的课（可多次使用 --lesson-id）
+node src/index.js --course "工程伦理概论" --cookies ./cookies.json \
+  --lesson-id 1704863264448235136 \
+  --lesson-id 1699795924878665984
+
+# 下载指定日期的课（可多次使用 --lesson-date）
+node src/index.js --course "工程伦理概论" --cookies ./cookies.json \
+  --lesson-date 2026-06-10
+
+# Manifest 模式同样支持过滤
+node src/index.js --manifest ./manifest.json --latest
+```
+
+过滤规则：
+
+- `--latest` 优先级最高，仅保留日期最新的一次课时。
+- `--since` / `--until` 按 `YYYY-MM-DD` 日期范围过滤。
+- `--lesson-id` 按 lessonId 精确匹配，可多次指定。
+- `--lesson-date` 按日期精确匹配，可多次指定。
+- 多个过滤条件同时存在时取交集。
 
 ## 环境变量
 
@@ -66,6 +107,11 @@ node src/index.js --manifest ./manifest.json
 - `RAIN_OUTPUT`
 - `RAIN_CONCURRENCY`
 - `RAIN_RETRY`
+- `RAIN_SINCE`
+- `RAIN_UNTIL`
+- `RAIN_LATEST`
+- `RAIN_LESSON_ID`（逗号分隔多个 ID）
+- `RAIN_LESSON_DATE`（逗号分隔多个日期）
 
 ## Manifest 格式
 

@@ -1,53 +1,8 @@
 import { buildApiHeaders } from './extract.js';
+import { fetchJson } from './api-client.js';
 
 const COURSES_API = 'https://changjiang.yuketang.cn/v2/api/web/courses/list';
 const LESSONS_API_BASE = 'https://changjiang.yuketang.cn/v2/api/web/logs/learn';
-
-function sleep(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-async function fetchJson(url, headers, retry = 3) {
-  let lastError;
-  for (let attempt = 0; attempt <= retry; attempt++) {
-    try {
-      const response = await fetch(url, {
-        method: 'GET',
-        headers,
-        redirect: 'follow',
-      });
-
-      const text = await response.text();
-      let data;
-      try {
-        data = JSON.parse(text);
-      } catch (err) {
-        throw new Error(`接口返回非 JSON: ${text.slice(0, 200)}`);
-      }
-
-      if (!response.ok) {
-        throw new Error(`接口 HTTP ${response.status}: ${data.errmsg || data.msg || response.statusText}`);
-      }
-
-      if (data.errcode !== undefined && data.errcode !== 0) {
-        throw new Error(`接口业务错误 [${data.errcode}]: ${data.errmsg || '未知错误'}`);
-      }
-
-      if (data.code !== undefined && data.code !== 0) {
-        throw new Error(`接口业务错误 [${data.code}]: ${data.msg || '未知错误'}`);
-      }
-
-      return data.data;
-    } catch (err) {
-      lastError = err;
-      if (attempt < retry) {
-        await sleep(Math.min(1000 * 2 ** attempt, 10000));
-      }
-    }
-  }
-
-  throw lastError;
-}
 
 export async function fetchCourseList(manifest, retry = 3) {
   const headers = buildApiHeaders(manifest, 'course-list');
@@ -55,7 +10,7 @@ export async function fetchCourseList(manifest, retry = 3) {
   delete headers['classroom-id'];
 
   const url = `${COURSES_API}?identity=2`;
-  const data = await fetchJson(url, headers, retry);
+  const data = await fetchJson(url, { headers }, retry);
 
   if (!data || !Array.isArray(data.list)) {
     throw new Error('课程列表接口返回格式异常');
@@ -104,7 +59,7 @@ export async function fetchLessonList(manifest, classroomId, retry = 3) {
   headers['classroom-id'] = String(classroomId);
 
   const url = `${LESSONS_API_BASE}/${classroomId}?actype=-1&page=0&offset=100&sort=-1`;
-  const data = await fetchJson(url, headers, retry);
+  const data = await fetchJson(url, { headers }, retry);
 
   if (!data || !Array.isArray(data.activities)) {
     throw new Error('课堂记录接口返回格式异常');

@@ -19,6 +19,7 @@
 - 支持 `minimist` 风格的参数。
 - 环境变量覆盖默认值。
 - 校验 `--course` 与 `--manifest` 二选一、工具模式必须提供 `--cookies`。
+- 新增课时过滤参数：`--since`、`--until`、`--latest`、`--lesson-id`、`--lesson-date`。
 
 ### `src/manifest.js`
 
@@ -36,6 +37,23 @@ Manifest 读取与校验：
 | `images` 数组 | 包装为单 PPT：`[{ presentationId: lessonId, title, images }]` |
 | `slideManifest` | 拼接 URL 后包装为单 PPT |
 | 无图片 | `presentations = []`，`needsExtraction = true` |
+
+### `src/api-client.js`
+
+公共 HTTP 客户端：
+
+- `fetchJson(url, options, retry)`：统一封装 `fetch`、JSON 解析、HTTP/业务错误判断、指数退避重试。
+- `isAuthError(err)`：识别认证相关错误，认证失败时不重试，直接抛出。
+- `discover.js` 与 `extract.js` 复用此模块，消除重复代码。
+
+### `src/filter-lessons.js`
+
+课时过滤：
+
+- `filterLessons(lessons, filters)`：按日期范围、`lessonId`、精确日期、`--latest` 过滤课时列表。
+- `buildLessonFilters(config)`：从 CLI 配置构建过滤器对象。
+- `hasActiveLessonFilters(filters)`：判断是否存在有效过滤条件。
+- 过滤逻辑在 `manifest.lessons` 确定后执行，对自动发现和显式 Manifest 均生效。
 
 ### `src/discover.js`
 
@@ -114,6 +132,7 @@ MiMo/OpenAI 兼容客户端封装：
 
 - `findExtractedNotes(courseDir, lessonPrefix)`：读取提取出的 JSON 笔记，可按课时前缀过滤。
 - `summarizeCourse(options)`：调用 LLM 生成 `review.md`；若指定 `lessonDir`，则输出到该课时目录下。
+- 当笔记页数超过阈值（默认 60 页）时，自动分块生成中间摘要，再合并为最终大纲，避免触发 token 上限。
 
 ## 错误处理策略
 

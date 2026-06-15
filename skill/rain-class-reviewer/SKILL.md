@@ -19,9 +19,15 @@ node src/index.js --course "工程伦理概论" --cookies ./cookies.json
 
 工具会严格匹配课程名。如果名称不匹配或存在多个同名课程，工具会直接报错。
 
+你也可以让工具只下载特定课时：
+
+```bash
+node src/index.js --course "工程伦理概论" --cookies ./cookies.json --latest
+```
+
 ### 模式 B：Skill 模式（由你调用）
 
-你通过浏览器完成登录态检查和课程模糊匹配，然后生成 Manifest 调用工具。
+你通过浏览器完成登录态检查和课程模糊匹配，然后生成 Manifest 调用工具。你可以在 Manifest 中列出全部课时，再让工具通过 `--latest`、`--since` 等参数过滤。
 
 ## 前置条件（硬性）
 

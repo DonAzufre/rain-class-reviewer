@@ -25,4 +25,27 @@ describe('config', () => {
   it('should throw when tool mode lacks cookies', () => {
     assert.throws(() => loadConfig(['node', 'index.js', '--course', '工程伦理概论']), /cookies/);
   });
+
+  it('should parse latest filter', () => {
+    const config = loadConfig(['node', 'index.js', '--course', '工程伦理概论', '--cookies', './cookies.json', '--latest']);
+    assert.equal(config.latest, true);
+  });
+
+  it('should parse since and until filters', () => {
+    const config = loadConfig(['node', 'index.js', '--course', '工程伦理概论', '--cookies', './cookies.json', '--since', '2026-06-01', '--until', '2026-06-10']);
+    assert.equal(config.since, '2026-06-01');
+    assert.equal(config.until, '2026-06-10');
+  });
+
+  it('should parse multiple lesson-id and lesson-date filters', () => {
+    const config = loadConfig([
+      'node', 'index.js', '--course', '工程伦理概论', '--cookies', './cookies.json',
+      '--lesson-id', '123',
+      '--lesson-id', '456',
+      '--lesson-date', '2026-06-01',
+      '--lesson-date', '2026-06-02',
+    ]);
+    assert.deepEqual(config.lessonIds, ['123', '456']);
+    assert.deepEqual(config.lessonDates, ['2026-06-01', '2026-06-02']);
+  });
 });

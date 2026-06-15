@@ -18,7 +18,7 @@ function isRateLimitError(err) {
   return err?.status === 429 || err?.code === 'rate_limit_exceeded';
 }
 
-async function callWithRetry(apiCall, retry = DEFAULT_RETRIES) {
+export async function callWithRetry(apiCall, retry = DEFAULT_RETRIES) {
   let lastError;
 
   for (let attempt = 0; attempt <= retry; attempt++) {
