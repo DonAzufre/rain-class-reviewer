@@ -120,18 +120,18 @@ export async function fetchLessonList(manifest, classroomId, retry = 3) {
       raw: activity,
     }));
 
-  return deduplicateByDate(lessons);
+  return deduplicateByActivityId(lessons);
 }
 
-function deduplicateByDate(lessons) {
+function deduplicateByActivityId(lessons) {
   const seen = new Set();
   const result = [];
 
   for (const lesson of lessons) {
-    if (seen.has(lesson.date)) {
+    if (seen.has(lesson.activityId)) {
       continue;
     }
-    seen.add(lesson.date);
+    seen.add(lesson.activityId);
     result.push(lesson);
   }
 
@@ -155,6 +155,7 @@ export async function discoverCourse(manifest, retry = 3) {
 
   manifest.lessons = lessons.map((l) => ({
     lessonId: l.lessonId,
+    activityId: l.activityId,
     date: l.date,
     title: l.title,
     needsExtraction: true,

@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
-import { sanitizeDirName, getLessonDir, padNumber } from '../src/organize.js';
+import { sanitizeDirName, getLessonDir, getPresentationDir, padNumber } from '../src/organize.js';
 
 describe('organize', () => {
   it('should sanitize directory name', () => {
@@ -18,5 +18,33 @@ describe('organize', () => {
     const lesson = { lessonId: 'l1', date: '2025-01-01', title: 'Lesson 1' };
     const dir = getLessonDir('/output', lesson);
     assert.ok(dir.includes('2025-01-01_l1_Lesson 1'));
+  });
+
+  it('should not create subdir for single-presentation lesson', () => {
+    const lesson = {
+      lessonId: 'l1',
+      date: '2025-01-01',
+      title: 'Lesson 1',
+      presentations: [{ presentationId: 'p1', title: 'A', images: [] }],
+    };
+    const lessonDir = getLessonDir('/output', lesson);
+    const pptDir = getPresentationDir(lessonDir, lesson, lesson.presentations[0], 0);
+    assert.equal(pptDir, lessonDir);
+  });
+
+  it('should create subdir for multi-presentation lesson', () => {
+    const lesson = {
+      lessonId: 'l1',
+      date: '2025-01-01',
+      title: 'Lesson 1',
+      presentations: [
+        { presentationId: 'p1', title: 'A', images: [] },
+        { presentationId: 'p2', title: 'B', images: [] },
+      ],
+    };
+    const lessonDir = getLessonDir('/output', lesson);
+    const pptDir = getPresentationDir(lessonDir, lesson, lesson.presentations[1], 1);
+    assert.ok(pptDir.includes('002_B'));
+    assert.ok(pptDir.startsWith(lessonDir + path.sep));
   });
 });

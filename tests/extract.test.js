@@ -18,7 +18,8 @@ describe('extract', () => {
       },
     };
 
-    const headers = buildApiHeaders(manifest, 'lesson1');
+    const referer = 'https://changjiang.yuketang.cn/v2/web/student-v3/123/lesson1/activity1';
+    const headers = buildApiHeaders(manifest, referer);
     assert.ok(headers.Cookie.includes('sessionid=abc'));
     assert.equal(headers['classroom-id'], '123');
     assert.equal(headers['university-id'], '789');
@@ -26,7 +27,7 @@ describe('extract', () => {
     assert.equal(headers['xtbz'], 'ykt');
     assert.equal(headers['X-CSRFToken'], 'csrf');
     assert.equal(headers['User-Agent'], 'CustomAgent');
-    assert.ok(headers.Referer.includes('/lesson/student/lesson1/overview'));
+    assert.equal(headers.Referer, referer);
   });
 
   it('should throw when sessionid is missing', () => {

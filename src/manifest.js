@@ -93,20 +93,38 @@ export function validateAndNormalize(manifest) {
       throw new Error('课时缺少 lessonId');
     }
 
+    lesson.presentations = lesson.presentations || [];
+
+    if (Array.isArray(lesson.presentations) && lesson.presentations.length > 0) {
+      // 已经提供了完整的多 PPT 结构，无需处理
+      lesson.needsExtraction = false;
+      continue;
+    }
+
     if (Array.isArray(lesson.images) && lesson.images.length > 0) {
-      // 已经是完整 URL 格式，无需处理
+      // 兼容旧的单 PPT images 格式
+      lesson.presentations = [{
+        presentationId: lesson.lessonId,
+        title: lesson.title || '',
+        images: lesson.images,
+      }];
       lesson.needsExtraction = false;
       continue;
     }
 
     if (lesson.slideManifest) {
-      lesson.images = normalizeSlideManifest(lesson.slideManifest);
+      const images = normalizeSlideManifest(lesson.slideManifest);
+      lesson.presentations = [{
+        presentationId: lesson.lessonId,
+        title: lesson.title || '',
+        images,
+      }];
       lesson.needsExtraction = false;
       continue;
     }
 
     // 未提供图片，需要从雨课堂接口提取
-    lesson.images = [];
+    lesson.presentations = [];
     lesson.needsExtraction = true;
   }
 

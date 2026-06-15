@@ -7,6 +7,7 @@ import { discoverCourse } from './discover.js';
 import {
   getCourseDir,
   getLessonDir,
+  getPresentationDir,
   ensureCourseMeta,
   writeLessonMeta,
   padNumber,
@@ -50,18 +51,21 @@ async function main() {
     const lessonDir = getLessonDir(manifest.outputDir, lesson);
 
     if (lesson.needsExtraction) {
-      const extractedUrls = await extractLessonImages(manifest, lesson, config.retry);
-      lesson.images = extractedUrls;
+      const presentations = await extractLessonImages(manifest, lesson, config.retry);
+      lesson.presentations = presentations;
       lesson.needsExtraction = false;
     }
 
-    if (!config.force && isLessonDownloaded(lessonDir, lesson.images.length)) {
+    const presentations = Array.isArray(lesson.presentations) ? lesson.presentations : [];
+    const totalImages = presentations.reduce((sum, p) => sum + (p.images?.length || 0), 0);
+
+    if (!config.force && isLessonDownloaded(lessonDir, presentations)) {
       lessonsResults.push({
         lessonId: lesson.lessonId,
         date: lesson.date,
         title: lesson.title,
-        totalImages: lesson.images.length,
-        downloadedCount: lesson.images.length,
+        totalImages,
+        downloadedCount: totalImages,
         failedCount: 0,
         skipped: true,
         failedImages: [],
@@ -69,33 +73,34 @@ async function main() {
       continue;
     }
 
-    const downloadTasks = lesson.images.map((url, index) => async () => {
-      const fileName = `${padNumber(index + 1, 3)}.jpg`;
-      const destPath = path.join(lessonDir, fileName);
-      const result = await downloadImage(url, destPath, {
-        cookie,
-        headers: manifest.headers,
-        retry: config.retry,
-      });
+    const allDownloadTasks = [];
+    for (const [pptIndex, ppt] of presentations.entries()) {
+      const pptDir = getPresentationDir(lessonDir, lesson, ppt, pptIndex);
 
-      if (!result.success) {
+      const tasks = (ppt.images || []).map((url, index) => async () => {
+        const fileName = `${padNumber(index + 1, 3)}.jpg`;
+        const destPath = path.join(pptDir, fileName);
+        const result = await downloadImage(url, destPath, {
+          cookie,
+          headers: manifest.headers,
+          retry: config.retry,
+        });
+
         return {
-          success: false,
+          success: result.success,
           url,
           index: index + 1,
+          presentationId: ppt.presentationId,
+          presentationTitle: ppt.title,
+          path: result.path,
           error: result.error,
         };
-      }
+      });
 
-      return {
-        success: true,
-        url,
-        index: index + 1,
-        path: result.path,
-      };
-    });
+      allDownloadTasks.push(...tasks);
+    }
 
-    const results = await runWithConcurrency(downloadTasks, config.concurrency);
+    const results = await runWithConcurrency(allDownloadTasks, config.concurrency);
     const failedImages = results.filter((r) => !r.success);
 
     await writeLessonMeta(lessonDir, lesson, results);
@@ -104,7 +109,7 @@ async function main() {
       lessonId: lesson.lessonId,
       date: lesson.date,
       title: lesson.title,
-      totalImages: lesson.images.length,
+      totalImages,
       downloadedCount: results.filter((r) => r.success).length,
       failedCount: failedImages.length,
       skipped: false,

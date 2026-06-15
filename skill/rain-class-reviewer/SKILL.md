@@ -85,7 +85,7 @@ const fullText = container.innerText;
 {
   "version": "1.0",
   "extractedAt": "2026-06-15T08:40:22.759Z",
-  "courseName": "工程伦理概论",
+  "courseName": "工程设计与分析",
   "cookies": {
     "sessionid": "...",
     "csrftoken": "...",
@@ -121,9 +121,12 @@ node src/index.js --manifest /path/to/manifest.json --json
 工具会：
 
 1. （若未提供）调用课程列表接口 `GET /v2/api/web/courses/list?identity=2` 严格匹配课程名，获取 `classroomId`。
-2. （若未提供）调用课堂记录接口 `GET /v2/api/web/logs/learn/{classroomId}?actype=-1&...`，按日期去重提取课时 `lessonId`。
-3. 对每个课时调用 `GET /api/v3/classroom-report/student/review?lesson_id={lessonId}&front_time={timestamp}` 获取幻灯片 URL。
+2. （若未提供）调用课堂记录接口 `GET /v2/api/web/logs/learn/{classroomId}?actype=-1&...`，按课堂活动 `activityId` 去重提取课时 `lessonId`，**保留同一天多次课堂活动**。
+3. 对每个课时调用新版接口：
+   - `GET /api/v3/lesson-summary/student?lesson_id={lessonId}` 获取该课时的所有 PPT。
+   - `GET /api/v3/lesson-summary/student/presentation?presentation_id={pptId}&lesson_id={lessonId}` 获取每个 PPT 的全部幻灯片 URL（包括未在课堂中展示的页面）。
 4. 并发下载到 `downloads/{courseName}/` 目录（可通过 `--output` 修改）。
+5. 若课时包含多个 PPT，每个 PPT 会放入独立的 `序号_PPT标题/` 子目录。
 
 ### 7. 处理结果
 
@@ -136,12 +139,7 @@ node src/index.js --manifest /path/to/manifest.json --json
 
 ## 已知限制
 
-雨课堂 `review` 接口只返回**课堂中实际展示过的幻灯片**，不是课件的全部页面。工具会在遇到这种情况时输出警告。如果用户要求完整课件，你需要：
-
-1. 进入单次课堂详情页。
-2. 在 iframe 中滚动加载全部幻灯片。
-3. 读取所有 `img[src*="/slide/"]` 的 URL。
-4. 将完整 `images` 数组填入 Manifest。
+工具会优先使用新版 `lesson-summary` + `presentation` 接口获取完整 PPT。如果该接口不可用（例如某些旧课程或权限不足），会**自动回退**到 `review` 接口，但 `review` 接口只返回课堂中实际展示过的幻灯片，并输出警告。
 
 ## 禁止行为
 
