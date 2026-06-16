@@ -1,6 +1,6 @@
 ---
 name: rain-class-reviewer
-description: 通过 chrome-devtools-mcp 获取长江雨课堂登录 Cookie，然后调用本地脚本完成课程发现、PPT 下载、Markdown 笔记提取与复习大纲生成。当用户提到长江雨课堂、雨课堂、下载课件、生成复习大纲、课程总结、rain-class-reviewer 时触发。
+description: 通过 chrome-devtools-mcp 获取长江雨课堂登录 Cookie（包括 HttpOnly Cookie），然后调用本地脚本完成课程发现、PPT 下载、Markdown 笔记提取与复习大纲生成。当用户提到长江雨课堂、雨课堂、下载课件、生成复习大纲、课程总结、rain-class-reviewer 时触发。
 whenToUse: 用户需要从长江雨课堂下载课件图片、按课时过滤下载，或生成/总结课程复习材料时
 type: prompt
 disableModelInvocation: false
@@ -16,12 +16,15 @@ disableModelInvocation: false
 
 1. 打开 `https://changjiang.yuketang.cn/` 并检查登录状态。
 2. 在用户未登录时，提示用户完成登录，并等待用户确认。
-3. 登录后通过 `evaluate_script` 提取 `document.cookie` 中的 `sessionid`、`csrftoken`、`uv_id`、`university_id`、`xtbz`。
+3. 登录后获取 Cookie：
+   - 优先通过 **DevTools Network 请求头**读取 `Cookie` 字段（可获取包括 HttpOnly 在内的所有 Cookie）。
+   - 若请求头中无法获取，可回退到读取非 HttpOnly 的 `document.cookie`。
+   - 处理脚本无法完成的复杂/模糊任务（如页面人机验证、需要用户在页面上手动点选的弹窗、浏览器独有的登录流程）。
 4. 处理脚本无法完成的复杂/模糊任务（如页面人机验证、需要用户在页面上手动点选的弹窗、浏览器独有的登录流程）。
 
 ### 禁止使用 chrome-devtools-mcp 做的事
 
-- 调用课程列表、课时列表、PPT 提取等 API。
+- 调用课程列表、课时列表、PPT 提取等 API 并读取响应数据来获取业务信息。
 - 翻页、抓图、解析页面 HTML 来获取课程/课时/PPT 数据。
 - 直接下载图片。
 - 直接生成或修改复习大纲。
@@ -29,19 +32,22 @@ disableModelInvocation: false
 
 **这些任务必须调用 `scripts/bootstrap.js` 实现。** 具体接口清单见 `references/yuketang-api.md`。
 
+> **关键区别**：用 MCP 读取网络请求的 `Cookie` **请求头**属于“获取登录态”，是允许的；用 MCP 读取 API 响应体属于“获取业务数据”，是禁止的。
+
 ### 最小 Manifest 构造后必须停止 MCP
 
 一旦你通过 MCP 拿到 Cookie 并构造出最小 Manifest（包含 `version`、`courseName`、`cookies`），**立即停止所有 chrome-devtools-mcp 操作**。后续步骤必须交给脚本：
 
 1. `node scripts/bootstrap.js verify-auth --manifest -` 校验登录态。
-2. `node scripts/bootstrap.js --manifest - --json` 下载课件。
-3. `node scripts/bootstrap.js summarize --course-dir "downloads/<课程名>" --force-summary` 提取笔记并生成复习大纲。
+2. `node scripts/bootstrap.js list-courses --manifest - --json` 获取课程列表。
+3. `node scripts/bootstrap.js --manifest - --json` 下载课件。
+4. `node scripts/bootstrap.js summarize --course-dir "downloads/<课程名>" --force-summary` 提取笔记并生成复习大纲。
 
 只有在脚本明确报告需要人工处理（如验证码、需要用户在浏览器里点选）时，才允许再次启用 MCP，且处理完后必须立刻回到脚本流程。
 
 ## 能力概述
 
-- **自动登录态获取**：使用 chrome-devtools-mcp 连接浏览器，检查/等待用户登录后自动提取 Cookie。
+- **自动登录态获取**：使用 chrome-devtools-mcp 连接浏览器，检查/等待用户登录后自动提取 Cookie（支持 HttpOnly Cookie）。
 - **脚本化后续流程**：登录态校验、课程发现、课时列表、PPT 下载、Markdown 笔记提取、复习大纲生成全部通过本地脚本完成。
 - **过滤下载**：支持按日期、课时 ID、最新课时等条件下载。
 - **Markdown 笔记**：每页 PPT 保存为独立 Markdown 文档，包含标题、要点、公式、关键词、核心概念和详细总结。
@@ -61,7 +67,7 @@ disableModelInvocation: false
 
 ```text
 1. 询问用户课程名（或关键词）。
-2. 用 MCP 打开 https://changjiang.yuketang.cn/ 并获取 Cookie。
+2. 用 MCP 打开 https://changjiang.yuketang.cn/ 并获取 Cookie（优先从 Network 请求头读取）。
 3. 构造最小 Manifest JSON。
 4. 运行 node scripts/bootstrap.js verify-auth --manifest - 校验登录态。
 5. 运行 node scripts/bootstrap.js list-courses --manifest - --json 获取课程列表。
@@ -78,21 +84,52 @@ disableModelInvocation: false
 
 ### 2. 使用 MCP 获取 Cookie
 
+长江雨课堂的 `sessionid` 通常是 **HttpOnly Cookie**，无法通过 `document.cookie` 读取。请按以下步骤获取：
+
+#### 2.1 打开页面并触发带 Cookie 的网络请求
+
 1. 连接浏览器。
 2. 导航到 `https://changjiang.yuketang.cn/`。
-3. 检查登录状态：
-   - 通过 `evaluate_script` 读取 `document.cookie`，检查是否包含 `sessionid`。
-   - 或检查页面 DOM 是否显示当前用户信息。
-4. 若未登录：
-   - 提示用户手动登录。
-   - 等待用户回复“已登录”。
-   - 刷新页面，重新检查。
-5. 已登录后，从 `document.cookie` 解析：
+3. 如果页面已经加载过，可以刷新一次以产生新的网络请求：
+   ```text
+   mcp__chrome-devtools__navigate_page: type=reload, url=https://changjiang.yuketang.cn/
+   ```
+4. 若页面未产生足够请求，可通过 `evaluate_script` 触发一次轻量请求（目的仅为产生一条带 Cookie 的网络请求，不读取业务数据）：
+   ```javascript
+   fetch('/v2/api/web/courses/list?identity=2', { credentials: 'include' });
+   ```
+
+#### 2.2 从 Network 请求头中读取 Cookie
+
+1. 调用 `list_network_requests` 查看最近的请求。
+2. 找到发往 `changjiang.yuketang.cn` 的请求（如页面文档、JS/CSS、或 `/v2/api/web/courses/list`）。
+3. 使用 `get_network_request` 读取该请求的 **Request Headers**。
+4. 在请求头中找到 `cookie` 或 `Cookie` 字段，从中解析：
    - `sessionid`
    - `csrftoken`
    - `uv_id`（通常为 `2874`）
    - `university_id`（通常为 `2874`）
    - `xtbz`（通常为 `ykt`）
+
+示例 Cookie 头：
+
+```text
+sessionid=abc123; csrftoken=xyz789; uv_id=2874; university_id=2874; xtbz=ykt
+```
+
+#### 2.3 处理未登录情况
+
+- 如果请求头中没有 `sessionid`，或请求被重定向到登录页，说明用户未登录。
+- 提示用户手动登录长江雨课堂。
+- 等待用户回复“已登录”。
+- 刷新页面或再次触发请求，重新读取 Cookie。
+
+#### 2.4 回退方案
+
+如果 MCP 无法提供请求头中的 Cookie：
+
+1. 尝试读取 `document.cookie` 获取非 HttpOnly Cookie（通常至少能拿到 `csrftoken`）。
+2. 如果仍无法拿到 `sessionid`，请用户手动提供 `sessionid`，或检查 MCP 是否支持获取 HttpOnly Cookie。
 
 ### 3. 构造最小 Manifest
 
@@ -154,7 +191,7 @@ echo '<manifest-json>' | node scripts/bootstrap.js list-courses --manifest - --j
 echo '<manifest-with-classroomid>' | node scripts/bootstrap.js --manifest - --json
 ```
 
-### 6. 提取 Markdown 笔记并生成复习大纲
+### 8. 提取 Markdown 笔记并生成复习大纲
 
 ```bash
 node scripts/bootstrap.js summarize --course-dir "downloads/<课程名>" --force-summary

@@ -73,14 +73,14 @@ Skill 工作流：
 1. 询问用户课程名（或关键词）。
 2. 通过 chrome-devtools-mcp 连接浏览器并打开长江雨课堂。
 3. 检查登录状态；未登录时要求用户登录。
-4. 登录后自动提取 Cookie，构造最小 Manifest，**立即停止 MCP**。
+4. 登录后从 DevTools Network 请求头读取 Cookie（支持 HttpOnly Cookie），构造最小 Manifest，**立即停止 MCP**。
 5. 调用 `node scripts/bootstrap.js verify-auth --manifest -` 校验登录态。
 6. 调用 `node scripts/bootstrap.js list-courses --manifest - --json` 获取课程列表。
 7. 根据用户输入匹配课程；有歧义时展示候选并让用户确认 `classroomId`。
 8. 调用 `node scripts/bootstrap.js --manifest - --json` 下载课件图片。
 9. 调用 `node scripts/bootstrap.js summarize --course-dir ...` 提取 Markdown 笔记并生成 `review.md`。
 
-完整接口清单与约束见 `references/yuketang-api.md`。
+完整接口清单、Cookie 提取细节与约束见 `references/yuketang-api.md` 和 `SKILL.md`。
 
 手动使用 Manifest（可通过 stdin 避免临时文件）：
 

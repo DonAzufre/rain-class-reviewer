@@ -1,6 +1,7 @@
 # 使用指南
 
-> 接口清单与约束：`references/yuketang-api.md`
+> 接口清单与约束：`references/yuketang-api.md`  
+> Cookie 提取细节：`SKILL.md`（优先从 DevTools Network 请求头读取，支持 HttpOnly Cookie）
 
 ## 安装
 
