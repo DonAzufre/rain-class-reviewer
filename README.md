@@ -80,7 +80,7 @@ Skill 工作流：
 5. 调用 `node <skill-path>/scripts/bootstrap.js verify-auth --manifest <skill-path>/tmp/manifest.json` 校验登录态。
 6. 调用 `node <skill-path>/scripts/bootstrap.js list-courses --manifest <skill-path>/tmp/manifest.json --json` 获取课程列表。
 7. 根据用户输入匹配课程；有歧义时展示候选并让用户确认 `classroomId`。
-8. 使用课程列表返回的原始课程名，覆盖 `tmp/manifest.json`，调用 `node <skill-path>/scripts/bootstrap.js --manifest <skill-path>/tmp/manifest.json --output rain-class-reviewer-downloads --json` 下载课件图片。
+8. 使用课程列表返回的原始 courseName，覆盖 `tmp/manifest.json`，调用 `node <skill-path>/scripts/bootstrap.js --manifest <skill-path>/tmp/manifest.json --json` 下载课件图片（默认输出到项目根目录的 `rain-class-reviewer-downloads/`）。
 9. 调用 `node <skill-path>/scripts/bootstrap.js summarize --course-dir rain-class-reviewer-downloads/<课程名> ...` 提取 Markdown 笔记并生成 `review.md`。
 
 完整接口清单、Cookie 提取细节与约束见 `references/yuketang-api.md` 和 `SKILL.md`。
@@ -88,7 +88,7 @@ Skill 工作流：
 手动使用 Manifest：
 
 ```bash
-node src/index.js --manifest ./manifest.json --output rain-class-reviewer-downloads
+node src/index.js --manifest ./manifest.json
 ```
 
 最简 Manifest 示例：

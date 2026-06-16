@@ -40,7 +40,7 @@ disableModelInvocation: false
 
 1. `node <skill-path>/scripts/bootstrap.js verify-auth --manifest <skill-path>/tmp/manifest.json` 校验登录态。
 2. `node <skill-path>/scripts/bootstrap.js list-courses --manifest <skill-path>/tmp/manifest.json --json` 获取课程列表。
-3. `node <skill-path>/scripts/bootstrap.js --manifest <skill-path>/tmp/manifest.json --output rain-class-reviewer-downloads --json` 下载课件。
+3. `node <skill-path>/scripts/bootstrap.js --manifest <skill-path>/tmp/manifest.json --json` 下载课件（默认输出到项目根目录的 `rain-class-reviewer-downloads/`）。
 4. `node <skill-path>/scripts/bootstrap.js summarize --course-dir "rain-class-reviewer-downloads/<课程名>" --force-summary` 提取笔记并生成复习大纲。
 
 > 为兼容 Claude Code auto mode 的安全策略，**不要把 Manifest 通过 stdin 传入**。把最终 Manifest 写入 Skill 目录下的 `tmp/manifest.json`（覆盖写入），并在命令中通过路径引用。`tmp/` 已在 `.gitignore` 中，不会进入版本控制。
@@ -63,7 +63,12 @@ disableModelInvocation: false
 
 ## 快速开始
 
-**所有命令应在当前 Claude Code / OpenCode 项目根目录执行**，通过 Skill 目录的相对路径调用脚本。首次调用时 `scripts/bootstrap.js` 会优先使用预构建的 `dist/cli.cjs`（已包含 `openai` 等依赖），无需联网安装；若不存在才会自动 `npm install`。
+**所有命令应在当前 Claude Code / OpenCode 项目根目录执行**，通过 Skill 目录的相对路径调用脚本。`scripts/bootstrap.js` 会自动把项目根目录当作工作目录，因此：
+
+- 相对路径的 `--manifest`、`-o`、`--course-dir`、`--lesson-dir` 等参数都以项目根目录为基准解析，不会出现路径重复。
+- 不指定 `--output` 时，默认下载目录会生成在项目根目录的 `rain-class-reviewer-downloads/` 下，而不是 Skill 安装目录下。
+
+首次调用时 `scripts/bootstrap.js` 会优先使用预构建的 `dist/cli.cjs`（已包含 `openai` 等依赖），无需联网安装；若不存在才会自动 `npm install`。
 
 ### 完整流程
 
@@ -74,7 +79,7 @@ disableModelInvocation: false
 4. 运行 node <skill-path>/scripts/bootstrap.js verify-auth --manifest <skill-path>/tmp/manifest.json 校验登录态。
 5. 运行 node <skill-path>/scripts/bootstrap.js list-courses --manifest <skill-path>/tmp/manifest.json --json 获取课程列表。
 6. 根据用户输入匹配课程；有歧义时向用户展示候选并确认 classroomId。
-7. 使用课程列表返回的原始 courseName，构造带 classroomId 的 Manifest（覆盖 tmp/manifest.json），运行 node <skill-path>/scripts/bootstrap.js --manifest <skill-path>/tmp/manifest.json --output rain-class-reviewer-downloads --json 下载。
+7. 使用课程列表返回的原始 courseName，构造带 classroomId 的 Manifest（覆盖 tmp/manifest.json），运行 node <skill-path>/scripts/bootstrap.js --manifest <skill-path>/tmp/manifest.json --json 下载（默认输出到 rain-class-reviewer-downloads/）。
 8. 运行 node <skill-path>/scripts/bootstrap.js summarize --course-dir "rain-class-reviewer-downloads/<原始课程名>" --force-summary 生成复习大纲。
 ```
 
@@ -82,8 +87,7 @@ disableModelInvocation: false
 
 ```bash
 node .claude/skills/rain-class-reviewer/scripts/bootstrap.js \
-  --manifest .claude/skills/rain-class-reviewer/tmp/manifest.json \
-  --output rain-class-reviewer-downloads --json
+  --manifest .claude/skills/rain-class-reviewer/tmp/manifest.json --json
 ```
 
 ## 标准执行流程
@@ -201,7 +205,7 @@ node <skill-path>/scripts/bootstrap.js list-courses --manifest <skill-path>/tmp/
 ### 7. 下载课件
 
 ```bash
-node <skill-path>/scripts/bootstrap.js --manifest <skill-path>/tmp/manifest.json --output rain-class-reviewer-downloads --json
+node <skill-path>/scripts/bootstrap.js --manifest <skill-path>/tmp/manifest.json --json
 ```
 
 ### 8. 提取 Markdown 笔记并生成复习大纲
@@ -220,13 +224,13 @@ node <skill-path>/scripts/bootstrap.js summarize --course-dir "rain-class-review
 只下载最新一次课时：
 
 ```bash
-node <skill-path>/scripts/bootstrap.js --manifest <skill-path>/tmp/manifest.json --latest --output rain-class-reviewer-downloads --json
+node <skill-path>/scripts/bootstrap.js --manifest <skill-path>/tmp/manifest.json --latest --json
 ```
 
 按日期范围下载：
 
 ```bash
-node <skill-path>/scripts/bootstrap.js --manifest <skill-path>/tmp/manifest.json --since 2023-11-01 --until 2023-11-05 --output rain-class-reviewer-downloads --json
+node <skill-path>/scripts/bootstrap.js --manifest <skill-path>/tmp/manifest.json --since 2023-11-01 --until 2023-11-05 --json
 ```
 
 ## 课程名歧义处理
