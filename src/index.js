@@ -19,7 +19,7 @@ import { createClient } from './llm.js';
 import { extractNotesFromCourse } from './extract-notes.js';
 import { summarizeCourse } from './summarize-course.js';
 import path from 'node:path';
-import { runVerifyAuth, buildToolManifest } from './verify-auth.js';
+import { runVerifyAuth, runListCourses, buildToolManifest } from './verify-auth.js';
 
 async function runDownload(config) {
   const manifest = config.manifest
@@ -182,6 +182,12 @@ async function main() {
 
   if (config.verifyAuth) {
     const { ok } = await runVerifyAuth(config);
+    process.exitCode = ok ? 0 : 1;
+    return;
+  }
+
+  if (config.listCourses) {
+    const { ok } = await runListCourses(config);
     process.exitCode = ok ? 0 : 1;
     return;
   }

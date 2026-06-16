@@ -60,19 +60,21 @@ disableModelInvocation: false
 ### 完整流程
 
 ```text
-1. 询问用户课程名。
+1. 询问用户课程名（或关键词）。
 2. 用 MCP 打开 https://changjiang.yuketang.cn/ 并获取 Cookie。
 3. 构造最小 Manifest JSON。
 4. 运行 node scripts/bootstrap.js verify-auth --manifest - 校验登录态。
-5. 若有效，运行 node scripts/bootstrap.js --manifest - --json 下载。
-6. 运行 node scripts/bootstrap.js summarize --course-dir "downloads/<课程名>" --force-summary 生成复习大纲。
+5. 运行 node scripts/bootstrap.js list-courses --manifest - --json 获取课程列表。
+6. 根据用户输入匹配课程；有歧义时向用户展示候选并确认 classroomId。
+7. 构造带 classroomId 的 Manifest，运行 node scripts/bootstrap.js --manifest - --json 下载。
+8. 运行 node scripts/bootstrap.js summarize --course-dir "downloads/<课程名>" --force-summary 生成复习大纲。
 ```
 
 ## 标准执行流程
 
-### 1. 获取课程名
+### 1. 获取用户期望的课程名
 
-向用户确认课程名，例如“工程伦理概论”。
+向用户确认课程名，允许使用简称或关键词，例如“计算机网络”。记录用户原始输入，不要立即做任何匹配。
 
 ### 2. 使用 MCP 获取 Cookie
 
@@ -97,7 +99,7 @@ disableModelInvocation: false
 ```json
 {
   "version": "1.0",
-  "courseName": "工程伦理概论",
+  "courseName": "计算机网络",
   "cookies": {
     "sessionid": "...",
     "csrftoken": "...",
@@ -108,7 +110,7 @@ disableModelInvocation: false
 }
 ```
 
-**构造完此 Manifest 后，立即停止 MCP。**
+`courseName` 使用用户原始输入。此 Manifest 只用于校验和获取课程列表，不保证最终匹配。**构造完此 Manifest 后，立即停止 MCP。**
 
 ### 4. 校验登录态
 
@@ -119,13 +121,38 @@ echo '<manifest-json>' | node scripts/bootstrap.js verify-auth --manifest -
 - 成功：继续下一步。
 - 失败：返回步骤 2，重新获取 Cookie。
 
-### 5. 下载课件
+### 5. 获取课程列表
 
 ```bash
-echo '<manifest-json>' | node scripts/bootstrap.js --manifest - --json
+echo '<manifest-json>' | node scripts/bootstrap.js list-courses --manifest - --json
 ```
 
-若存在同名课程歧义，脚本会报错并列出候选 `classroomId`。**禁止擅自选择**，必须向用户展示候选课程并要求确认。确认后，在 Manifest 中显式添加 `classroomId` 再重试。
+返回当前账号下所有课程的 `classroomId`、`courseName`、`className`、`teacher`。
+
+### 6. 匹配课程并处理歧义
+
+用用户原始输入匹配课程列表：
+
+- **唯一精确匹配**：直接使用该 `classroomId`。
+- **无匹配**：向用户展示所有可用课程，要求用户指定课程名或 `classroomId`。
+- **多个匹配**：向用户展示候选课程（含班级、教师、classroomId），要求用户确认。
+
+**禁止擅自选择。** 确认后，构造新的 Manifest：
+
+```json
+{
+  "version": "1.0",
+  "courseName": "计算机网络",
+  "classroomId": "13522533",
+  "cookies": { ... }
+}
+```
+
+### 7. 下载课件
+
+```bash
+echo '<manifest-with-classroomid>' | node scripts/bootstrap.js --manifest - --json
+```
 
 ### 6. 提取 Markdown 笔记并生成复习大纲
 

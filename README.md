@@ -70,13 +70,15 @@ Agent 可通过本项目的 `SKILL.md` 自动加载工作流。首次调用时�
 
 Skill 工作流：
 
-1. 通过 chrome-devtools-mcp 连接浏览器并打开长江雨课堂。
-2. 检查登录状态；未登录时要求用户登录。
-3. 登录后自动提取 Cookie。
-4. 构造最小 Manifest，**立即停止 MCP**。
+1. 询问用户课程名（或关键词）。
+2. 通过 chrome-devtools-mcp 连接浏览器并打开长江雨课堂。
+3. 检查登录状态；未登录时要求用户登录。
+4. 登录后自动提取 Cookie，构造最小 Manifest，**立即停止 MCP**。
 5. 调用 `node scripts/bootstrap.js verify-auth --manifest -` 校验登录态。
-6. 调用 `node scripts/bootstrap.js --manifest - --json` 下载课件图片。
-7. 调用 `node scripts/bootstrap.js summarize --course-dir ...` 提取 Markdown 笔记并生成 `review.md`。
+6. 调用 `node scripts/bootstrap.js list-courses --manifest - --json` 获取课程列表。
+7. 根据用户输入匹配课程；有歧义时展示候选并让用户确认 `classroomId`。
+8. 调用 `node scripts/bootstrap.js --manifest - --json` 下载课件图片。
+9. 调用 `node scripts/bootstrap.js summarize --course-dir ...` 提取 Markdown 笔记并生成 `review.md`。
 
 完整接口清单与约束见 `references/yuketang-api.md`。
 
@@ -110,6 +112,18 @@ node src/index.js --course "算法设计与分析" --cookies ./cookies.json --fo
 
 ```bash
 cat <<'EOF' | node src/index.js verify-auth --manifest -
+{
+  "version": "1.0",
+  "courseName": "算法设计与分析",
+  "cookies": { "sessionid": "...", "csrftoken": "...", "uv_id": "2874", "university_id": "2874", "xtbz": "ykt" }
+}
+EOF
+```
+
+列出当前账号课程：
+
+```bash
+cat <<'EOF' | node src/index.js list-courses --manifest - --json
 {
   "version": "1.0",
   "courseName": "算法设计与分析",

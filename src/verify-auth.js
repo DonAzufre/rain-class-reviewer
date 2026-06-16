@@ -53,3 +53,36 @@ export async function runVerifyAuth(config) {
     return { ok: false, error: err };
   }
 }
+
+export async function runListCourses(config) {
+  const manifest = config.manifest
+    ? readManifest(config.manifest)
+    : buildToolManifest(config);
+
+  try {
+    const courses = await fetchCourseList(manifest, config.retry);
+    const list = courses.map((c) => ({
+      classroomId: c.classroomId,
+      courseName: c.courseName,
+      className: c.className,
+      teacher: c.teacher,
+    }));
+
+    if (config.json) {
+      console.log(JSON.stringify({ ok: true, courses: list }));
+    } else {
+      for (const c of list) {
+        console.log(`${c.classroomId}\t${c.courseName}\t${c.className}\t${c.teacher || ''}`);
+      }
+    }
+    return { ok: true, courses: list };
+  } catch (err) {
+    const message = `获取课程列表失败: ${err.message}`;
+    if (config.json) {
+      console.log(JSON.stringify({ ok: false, error: err.message, message }));
+    } else {
+      console.error(message);
+    }
+    return { ok: false, error: err };
+  }
+}

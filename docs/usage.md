@@ -236,6 +236,31 @@ node src/index.js verify-auth --manifest - < ./manifest.json
 
 失败输出明确的认证错误，此时应重新获取 Cookie。
 
+## 列出课程
+
+获取当前账号下的所有课程，用于匹配/消歧：
+
+```bash
+node src/index.js list-courses --manifest ./manifest.json --json
+
+# 或从 stdin 读取
+node src/index.js list-courses --manifest - --json < ./manifest.json
+```
+
+JSON 输出示例：
+
+```json
+{
+  "ok": true,
+  "courses": [
+    { "classroomId": "13522533", "courseName": "计算机网络", "className": "21计算机类地方本科班", "teacher": "杨翔瑞" },
+    { "classroomId": "14737547", "courseName": "计算机网络", "className": "2023秋季无J籍", "teacher": "蔡开裕" }
+  ]
+}
+```
+
+Agent/Skill 流程中，先 `list-courses` 再匹配用户输入；若存在同名课程歧义，必须向用户展示候选并确认 `classroomId`。
+
 ## 总结模式
 
 下载完成后，可以对课程图片进行 LLM 识别、信息提取和去重总结：
@@ -249,6 +274,8 @@ node src/index.js summarize --course-dir "downloads/算法设计与分析"
 | 参数 | 说明 | 默认值 |
 |------|------|--------|
 | `summarize` | 子命令，进入总结模式 | - |
+| `verify-auth` | 子命令，校验登录态 | - |
+| `list-courses` | 子命令，列出当前账号课程 | - |
 | `--course-dir <dir>` | 已下载课程的目录路径 | `RAIN_COURSE_DIR` |
 | `--lesson-dir <dir>` | 只总结课程下的某一课时目录 | `RAIN_LESSON_DIR` |
 | `--model <name>` | 总结模型 | `mimo-v2.5-pro` |

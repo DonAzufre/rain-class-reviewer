@@ -23,6 +23,8 @@ const DEFAULTS = {
   summarize: false,
   // 认证校验模式
   verifyAuth: false,
+  // 课程列表模式
+  listCourses: false,
   courseDir: process.env.RAIN_COURSE_DIR || undefined,
   lessonDir: process.env.RAIN_LESSON_DIR || undefined,
   model: process.env.RAIN_MODEL || 'mimo-v2.5-pro',
@@ -42,6 +44,9 @@ function parseArgs(argv) {
     args.shift();
   } else if (args[0] === 'verify-auth') {
     config.verifyAuth = true;
+    args.shift();
+  } else if (args[0] === 'list-courses') {
+    config.listCourses = true;
     args.shift();
   }
 
@@ -132,11 +137,12 @@ function parseArgs(argv) {
 
 function showHelp() {
   console.log(`
-用法: node src/index.js [summarize | verify-auth] [选项]
+用法: node src/index.js [summarize | verify-auth | list-courses] [选项]
 
 子命令:
   summarize                  进入总结模式
   verify-auth                校验登录态是否有效
+  list-courses               列出当前账号下的所有课程
 
 下载选项:
   -m, --manifest <path>      Manifest JSON 文件路径，使用 - 从 stdin 读取
@@ -220,16 +226,16 @@ export function loadConfig(argv = process.argv) {
     return config;
   }
 
-  // 认证校验模式校验
-  if (config.verifyAuth) {
+  // 认证校验 / 课程列表模式校验
+  if (config.verifyAuth || config.listCourses) {
     const hasManifest = Boolean(config.manifest);
     const hasToolMode = Boolean(config.course);
 
     if (!hasManifest && !hasToolMode) {
-      throw new Error('verify-auth 子命令必须提供 --manifest 或 --course（及 --cookies）');
+      throw new Error(`${config.verifyAuth ? 'verify-auth' : 'list-courses'} 子命令必须提供 --manifest 或 --course（及 --cookies）`);
     }
     if (hasToolMode && !config.cookies) {
-      throw new Error('verify-auth 工具模式必须提供 --cookies');
+      throw new Error(`${config.verifyAuth ? 'verify-auth' : 'list-courses'} 工具模式必须提供 --cookies`);
     }
     return config;
   }
@@ -239,7 +245,7 @@ export function loadConfig(argv = process.argv) {
   const hasToolMode = Boolean(config.course);
 
   if (!hasManifest && !hasToolMode) {
-    throw new Error('必须提供 --manifest 参数或 --course 参数（或对应环境变量），或使用 summarize/verify-auth 子命令');
+    throw new Error('必须提供 --manifest 参数或 --course 参数（或对应环境变量），或使用 summarize/verify-auth/list-courses 子命令');
   }
 
   if (hasToolMode && !config.cookies) {
