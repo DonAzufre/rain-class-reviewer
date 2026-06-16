@@ -102,27 +102,65 @@ node .claude/skills/rain-class-reviewer/scripts/bootstrap.js \
 
 ### 2. 使用 MCP 获取 Cookie
 
-长江雨课堂的 `sessionid` 通常是 **HttpOnly Cookie**，无法通过 `document.cookie` 读取。请按以下步骤获取：
+长江雨课堂的 `sessionid` 通常是 **HttpOnly Cookie**，无法通过 `document.cookie` 读取。你必须通过 **Chrome DevTools Network 请求头**获取，且必须严格使用下面列出的 URL。
 
-#### 2.1 打开页面并触发带 Cookie 的网络请求
+#### 2.1 打开长江雨课堂页面
+
+**必须导航到的 URL**：
+
+```text
+https://changjiang.yuketang.cn/
+```
+
+操作步骤：
 
 1. 连接浏览器。
-2. 导航到 `https://changjiang.yuketang.cn/`。
-3. 如果页面已经加载过，可以刷新一次以产生新的网络请求：
+2. 使用 `mcp__chrome-devtools__navigate_page` 导航到：
+   ```text
+   https://changjiang.yuketang.cn/
+   ```
+3. 如果页面已经加载过，使用 `type=reload` 刷新同一 URL，以产生新的网络请求：
    ```text
    mcp__chrome-devtools__navigate_page: type=reload, url=https://changjiang.yuketang.cn/
    ```
-4. 若页面未产生足够请求，可通过 `evaluate_script` 触发一次轻量请求（目的仅为产生一条带 Cookie 的网络请求，不读取业务数据）：
-   ```javascript
-   fetch('/v2/api/web/courses/list?identity=2', { credentials: 'include' });
-   ```
 
-#### 2.2 从 Network 请求头中读取 Cookie
+#### 2.2 触发一条带 Cookie 的网络请求
+
+刷新页面后，浏览器通常会自动产生多个带 Cookie 的请求。如果没有出现足够的请求，**必须**主动触发下列 URL：
+
+**首选触发 URL**（该 URL 与脚本后续 `verify-auth` / `list-courses` 使用的课程列表接口完全一致，安全且可复用）：
+
+```text
+GET https://changjiang.yuketang.cn/v2/api/web/courses/list?identity=2
+```
+
+触发方式（任选其一，**仅用于产生请求流量，禁止读取响应业务数据**）：
+
+- 方式 A：执行一次页面刷新（见 2.1）。
+- 方式 B：通过 `evaluate_script` 执行：
+  ```javascript
+  fetch('https://changjiang.yuketang.cn/v2/api/web/courses/list?identity=2', { credentials: 'include' });
+  ```
+
+**备用触发 URL**（当首选请求未出现时，任何发往 `changjiang.yuketang.cn` 的请求均可）：
+
+```text
+https://changjiang.yuketang.cn/            （页面文档）
+https://changjiang.yuketang.cn/v2/web/index （首页入口）
+https://changjiang.yuketang.cn/*           （同域名下的静态资源，如 JS/CSS）
+```
+
+> **禁止**使用其他雨课堂子域名或第三方接口来探测 Cookie。
+
+#### 2.3 从 Network 请求头中读取 Cookie
 
 1. 调用 `list_network_requests` 查看最近的请求。
-2. 找到发往 `changjiang.yuketang.cn` 的请求（如页面文档、JS/CSS、或 `/v2/api/web/courses/list`）。
+2. 在请求列表中按以下优先级选择一条请求：
+   - **优先**：`https://changjiang.yuketang.cn/v2/api/web/courses/list?identity=2`
+   - **次选**：`https://changjiang.yuketang.cn/` 或 `https://changjiang.yuketang.cn/v2/web/index`
+   - **可接受**：任何 `https://changjiang.yuketang.cn/*` 请求
 3. 使用 `get_network_request` 读取该请求的 **Request Headers**。
-4. 在请求头中找到 `cookie` 或 `Cookie` 字段，从中解析。常见字段包括：
+4. 在请求头中找到 `cookie` 或 `Cookie` 字段，解析以下字段：
    - `sessionid`（必须）
    - `csrftoken`（建议携带，用于 CSRF 校验）
    - `uv_id`（按实际值提取，可能是 `0` 或其他值）
@@ -138,19 +176,20 @@ sessionid=abc123; csrftoken=xyz789; uv_id=0; university_id=0; xtbz=ykt
 
 > 不要硬编码 `uv_id=2874` 或 `university_id=2874`，必须从请求头中读取实际值。缺失或 `0` 都是允许的。
 
-#### 2.3 处理未登录情况
+#### 2.4 处理未登录情况
 
 - 如果请求头中没有 `sessionid`，或请求被重定向到登录页，说明用户未登录。
 - 提示用户手动登录长江雨课堂。
 - 等待用户回复“已登录”。
-- 刷新页面或再次触发请求，重新读取 Cookie。
+- 刷新页面或再次触发 `https://changjiang.yuketang.cn/v2/api/web/courses/list?identity=2`，重新读取 Cookie。
 
-#### 2.4 回退方案
+#### 2.5 回退方案
 
 如果 MCP 无法提供请求头中的 Cookie：
 
 1. 尝试读取 `document.cookie` 获取非 HttpOnly Cookie（通常至少能拿到 `csrftoken`）。
 2. 如果仍无法拿到 `sessionid`，请用户手动提供 `sessionid`，或检查 MCP 是否支持获取 HttpOnly Cookie。
+3. **无论回退是否成功，最终仍然必须通过 Network 请求头拿到 `sessionid`**。
 
 ### 3. 构造最小 Manifest
 

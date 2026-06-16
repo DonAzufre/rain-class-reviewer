@@ -8,22 +8,45 @@
 
 ## 步骤
 
-### 1. 触发带 Cookie 的网络请求
+### 1. 打开页面并触发带 Cookie 的网络请求
 
-- 导航到 `https://changjiang.yuketang.cn/`。
+**必须打开/刷新的 URL**：
+
+```text
+https://changjiang.yuketang.cn/
+```
+
 - 如果页面已加载，可刷新一次产生新请求：
   ```text
   navigate_page type=reload url=https://changjiang.yuketang.cn/
   ```
+
+**首选触发 URL**（与 `verify-auth` / `list-courses` 使用的课程列表接口一致）：
+
+```text
+GET https://changjiang.yuketang.cn/v2/api/web/courses/list?identity=2
+```
+
 - 若请求不够，可通过 `evaluate_script` 触发一次轻量请求（目的仅为产生网络流量，不读取响应数据）：
   ```javascript
-  fetch('/v2/api/web/courses/list?identity=2', { credentials: 'include' });
+  fetch('https://changjiang.yuketang.cn/v2/api/web/courses/list?identity=2', { credentials: 'include' });
   ```
+
+**备用触发 URL**：
+
+```text
+https://changjiang.yuketang.cn/            （页面文档）
+https://changjiang.yuketang.cn/v2/web/index （首页入口）
+https://changjiang.yuketang.cn/*           （同域名静态资源）
+```
 
 ### 2. 读取请求头中的 Cookie
 
 1. 调用 `list_network_requests` 查看近期请求。
-2. 找到目标请求（如页面文档、静态资源或 `/v2/api/web/courses/list`）。
+2. 按优先级选择目标请求：
+   - 优先：`https://changjiang.yuketang.cn/v2/api/web/courses/list?identity=2`
+   - 次选：`https://changjiang.yuketang.cn/` 或 `https://changjiang.yuketang.cn/v2/web/index`
+   - 可接受：任何 `https://changjiang.yuketang.cn/*` 请求
 3. 调用 `get_network_request` 读取该请求的 **Request Headers**。
 4. 提取 `Cookie` 头，例如：
    ```text
