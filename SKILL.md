@@ -61,9 +61,29 @@ set RAIN_COOKIES={"sessionid":"...","csrftoken":"...","uv_id":"0","university_id
 
 ## 前置条件
 
-1. 已安装 Node.js（>= 18）和 npm。
-2. 当前 Agent 环境支持 **chrome-devtools-mcp**。
-3. 用户已明确指定要下载/总结的课程名。
+开始执行前，必须依次完成以下显式检查：
+
+1. **检查 Node.js 和 npm**
+   - 运行 `node -v`，确认主版本号 >= 18。
+   - 运行 `npm -v`，确认 npm 可用。
+   - 任一不满足时，停止并提示用户安装 Node.js >= 18。
+
+2. **检查 chrome-devtools-mcp**
+   - 尝试调用一次 MCP 浏览器工具（例如 `mcp__chrome-devtools__list_pages` 或 `mcp__chrome-devtools__navigate_page`）。
+   - 如果 MCP 不可用，停止并提示用户确认 Claude Code / OpenCode 已启用 chrome-devtools-mcp。
+
+3. **检查总结所需 API Key（仅在用户要求生成复习大纲时）**
+   - 检查环境变量 `MIMO_TP_API_KEY` 是否存在且以 `tp-` 开头。
+   - 如果已存在，继续执行。
+   - 如果不存在，**向用户询问 MiMo API Key**（以 `tp-` 开头）。
+   - 获得用户提供的 Key 后，在后续所有涉及总结的命令中通过环境变量传入，例如：
+     ```bash
+     set MIMO_TP_API_KEY=tp-xxxx
+     node .claude/skills/rain-class-reviewer/scripts/bootstrap.js summarize --course-dir rain-class-reviewer-downloads/<课程名>
+     ```
+   - **禁止**要求用户把 Key 写入文件，也禁止 Skill 把 Key 写入磁盘。
+
+4. **确认用户已明确指定要下载/总结的课程名。**
 
 ## 快速开始
 
@@ -84,7 +104,7 @@ set RAIN_COOKIES={"sessionid":"...","csrftoken":"...","uv_id":"0","university_id
 5. 运行 node <skill-path>/scripts/bootstrap.js list-courses --manifest <skill-path>/tmp/manifest.json --json 获取课程列表。
 6. 根据用户输入匹配课程；有歧义时向用户展示候选并确认 classroomId。
 7. 使用课程列表返回的原始 courseName，构造带 classroomId 的 Manifest（覆盖 tmp/manifest.json），运行 node <skill-path>/scripts/bootstrap.js --manifest <skill-path>/tmp/manifest.json --json 下载（默认输出到 rain-class-reviewer-downloads/）。
-8. 运行 node <skill-path>/scripts/bootstrap.js summarize --course-dir "rain-class-reviewer-downloads/<原始课程名>" --force-summary 生成复习大纲。
+8. 设置 `MIMO_TP_API_KEY` 后，运行 `node <skill-path>/scripts/bootstrap.js summarize --course-dir "rain-class-reviewer-downloads/<原始课程名>" --force-summary` 生成复习大纲。
 ```
 
 示例（Claude Code 项目级 Skill 路径为 `.claude/skills/rain-class-reviewer`）：
@@ -255,6 +275,7 @@ node <skill-path>/scripts/bootstrap.js --manifest <skill-path>/tmp/manifest.json
 ### 8. 提取 Markdown 笔记并生成复习大纲
 
 ```bash
+set MIMO_TP_API_KEY=tp-xxxx
 node <skill-path>/scripts/bootstrap.js summarize --course-dir "rain-class-reviewer-downloads/<课程名>" --force-summary
 ```
 
@@ -328,7 +349,7 @@ node .claude/skills/rain-class-reviewer/scripts/bootstrap.js verify-auth --manif
 ## 已知限制
 
 - 工具优先使用新版 `lesson-summary` + `presentation` 接口获取完整 PPT；若不可用会自动回退到 `review` 接口，但后者只包含课堂中展示过的幻灯片。
-- 总结功能依赖 MiMo API Key，需确保环境或 `tmp/mimo-apikey` 文件可用。
+- 总结功能依赖 MiMo API Key，必须通过 `MIMO_TP_API_KEY` 环境变量传入；禁止写入文件。
 
 ## 参考
 

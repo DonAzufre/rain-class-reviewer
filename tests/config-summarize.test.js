@@ -1,20 +1,9 @@
-import { describe, it, beforeEach, afterEach } from 'node:test';
+import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { loadConfig, loadApiKey } from '../src/config.js';
 
 describe('config summarize', () => {
-  let tempDir;
-
-  beforeEach(() => {
-    tempDir = mkdtempSync(path.join(tmpdir(), 'rain-config-'));
-  });
-
-  afterEach(() => {
-    rmSync(tempDir, { recursive: true, force: true });
-  });
 
   it('should parse summarize subcommand', () => {
     const config = loadConfig(['node', 'index.js', 'summarize', '--course-dir', '/tmp/course']);
@@ -44,41 +33,33 @@ describe('config summarize', () => {
     );
   });
 
-  it('should load api key from inline value', () => {
-    const key = loadApiKey({ apiKey: 'tp-test123' });
-    assert.equal(key, 'tp-test123');
-  });
-
-  it('should prefer MIMO_TP_API_KEY env var', () => {
+  it('should load api key from MIMO_TP_API_KEY env var', () => {
     process.env.MIMO_TP_API_KEY = 'tp-env123';
     try {
-      const key = loadApiKey({ apiKey: 'tp-test123' });
+      const key = loadApiKey();
       assert.equal(key, 'tp-env123');
     } finally {
       delete process.env.MIMO_TP_API_KEY;
     }
   });
 
-  it('should load api key from file', () => {
-    const keyPath = path.join(tempDir, 'key.txt');
-    writeFileSync(keyPath, 'tp-fromfile\n');
-    const key = loadApiKey({ apiKey: keyPath });
-    assert.equal(key, 'tp-fromfile');
-  });
-
-  it('should throw when api key file is missing', () => {
+  it('should throw when MIMO_TP_API_KEY env var is missing', () => {
+    delete process.env.MIMO_TP_API_KEY;
     assert.throws(
-      () => loadApiKey({ apiKey: path.join(tempDir, 'missing.txt') }),
-      /不存在/
+      () => loadApiKey(),
+      /MIMO_TP_API_KEY/
     );
   });
 
-  it('should throw when api key file content is invalid', () => {
-    const keyPath = path.join(tempDir, 'badkey.txt');
-    writeFileSync(keyPath, 'invalid-key');
-    assert.throws(
-      () => loadApiKey({ apiKey: keyPath }),
-      /格式不正确/
-    );
+  it('should throw when MIMO_TP_API_KEY env var is invalid', () => {
+    process.env.MIMO_TP_API_KEY = 'invalid-key';
+    try {
+      assert.throws(
+        () => loadApiKey(),
+        /tp-/
+      );
+    } finally {
+      delete process.env.MIMO_TP_API_KEY;
+    }
   });
 });

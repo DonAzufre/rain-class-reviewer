@@ -10,6 +10,12 @@ const nodeModulesDir = path.join(skillRoot, 'node_modules');
 const bundlePath = path.join(skillRoot, 'dist', 'cli.cjs');
 const cliEntry = path.join(skillRoot, 'src', 'index.js');
 
+const major = parseInt(process.versions.node.split('.')[0], 10);
+if (major < 18) {
+  console.error(`[bootstrap] 需要 Node.js >= 18，当前版本为 ${process.versions.node}`);
+  process.exit(1);
+}
+
 const AGENT_DIRS = new Set(['.claude', '.opencode', '.agents', '.codex', '.cursor']);
 const PATH_OPTIONS = new Set([
   '--manifest', '-m',
@@ -17,7 +23,6 @@ const PATH_OPTIONS = new Set([
   '--course-dir',
   '--lesson-dir',
   '--cookies',
-  '--api-key',
 ]);
 
 function deriveProjectRoot(skillRoot) {
@@ -96,10 +101,6 @@ function resolveCliArgs(args, projectRoot) {
       }
     } else if (arg === '--cookies') {
       if (value !== '-' && !value.startsWith('{')) {
-        value = path.resolve(projectRoot, value);
-      }
-    } else if (arg === '--api-key') {
-      if (!value.startsWith('tp-')) {
         value = path.resolve(projectRoot, value);
       }
     } else {

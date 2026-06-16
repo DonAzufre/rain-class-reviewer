@@ -123,7 +123,7 @@ node src/index.js --manifest ./manifest.json --latest
 - `RAIN_LATEST`
 - `RAIN_LESSON_ID`（逗号分隔多个 ID）
 - `RAIN_LESSON_DATE`（逗号分隔多个日期）
-- `MIMO_TP_API_KEY`（优先级最高，直接传入 MiMo key）
+- `MIMO_TP_API_KEY`（唯一 MiMo API Key 来源，值必须以 `tp-` 开头）
 
 ## Manifest 格式
 
@@ -268,7 +268,6 @@ node src/index.js summarize --course-dir "rain-class-reviewer-downloads/算法�
 | `--model <name>` | 总结模型 | `mimo-v2.5-pro` |
 | `--extract-model <name>` | 图像提取模型 | `mimo-v2.5` |
 | `--extract-concurrency <n>` | 图像提取并发数，遇到 429 可适当降低 | 2 |
-| `--api-key <path\|key>` | MiMo API Key 文件路径或直接传入 key。优先使用 `MIMO_TP_API_KEY` 环境变量 | `tmp/mimo-apikey` |
 | `--force-summary` | 强制重新生成 `review.md` | false |
 
 示例：
@@ -283,12 +282,12 @@ node src/index.js summarize \
   --lesson-dir "rain-class-reviewer-downloads/算法设计与分析/2024-12-24_1318590613705012608_5.2 贪心法正确性证明（2）"
 
 # 指定模型、降低并发避免限流
+set MIMO_TP_API_KEY=tp-xxxxx
 node src/index.js summarize \
   --course-dir "rain-class-reviewer-downloads/算法设计与分析" \
   --model mimo-v2.5-pro \
   --extract-model mimo-v2.5 \
-  --extract-concurrency 1 \
-  --api-key ./my-mimo-key.txt
+  --extract-concurrency 1
 
 # 强制重新提取并总结
 node src/index.js summarize --course-dir "rain-class-reviewer-downloads/算法设计与分析" --force-summary

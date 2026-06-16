@@ -178,12 +178,17 @@ node src/index.js summarize \
 已接入小米 MiMo Token Plan CN（OpenAI 兼容协议）：
 
 - Base URL: `https://token-plan-cn.xiaomimimo.com/v1`
-- API Key: `tp-xxxxx`
+- API Key: `tp-xxxxx`（仅通过 `MIMO_TP_API_KEY` 环境变量传入）
 - 模型: `mimo-v2.5` / `mimo-v2.5-pro`
-- API Key 优先从 `MIMO_TP_API_KEY` 环境变量读取，其次使用 `--api-key` 或 `RAIN_API_KEY`。
 
 命令预览：
 
 ```bash
+# Windows CMD
+set MIMO_TP_API_KEY=tp-xxxxx
+node src/index.js summarize --course-dir "rain-class-reviewer-downloads/工程伦理概论" --model mimo-v2.5
+
+# Git Bash / Linux / macOS
+export MIMO_TP_API_KEY='tp-xxxxx'
 node src/index.js summarize --course-dir "rain-class-reviewer-downloads/工程伦理概论" --model mimo-v2.5
 ```

@@ -1,4 +1,3 @@
-import { readFileSync } from 'node:fs';
 import path from 'node:path';
 
 const DEFAULTS = {
@@ -30,7 +29,6 @@ const DEFAULTS = {
   model: process.env.RAIN_MODEL || 'mimo-v2.5-pro',
   extractModel: process.env.RAIN_EXTRACT_MODEL || 'mimo-v2.5',
   extractConcurrency: parseInt(process.env.RAIN_EXTRACT_CONCURRENCY, 10) || 2,
-  apiKey: process.env.RAIN_API_KEY || 'tmp/mimo-apikey',
   forceSummary: false,
 };
 
@@ -113,9 +111,6 @@ function parseArgs(argv) {
       case '--extract-concurrency':
         config.extractConcurrency = parseInt(args[++i], 10) || DEFAULTS.extractConcurrency;
         break;
-      case '--api-key':
-        config.apiKey = args[++i];
-        break;
       case '--force-summary':
         config.forceSummary = true;
         break;
@@ -166,7 +161,6 @@ function showHelp() {
   --model <name>             总结模型 (默认: mimo-v2.5-pro)
   --extract-model <name>     图像提取模型 (默认: mimo-v2.5)
   --extract-concurrency <n>  图像提取并发数 (默认: 2)
-  --api-key <path|key>       MiMo API Key 文件路径或直接传入 key
   --force-summary            强制重新生成 review.md
   -h, --help                 显示帮助
 
@@ -175,44 +169,22 @@ function showHelp() {
   RAIN_COURSE, RAIN_CLASSROOM_ID, RAIN_COOKIES
   RAIN_SINCE, RAIN_UNTIL, RAIN_LATEST, RAIN_LESSON_ID, RAIN_LESSON_DATE
   RAIN_COURSE_DIR, RAIN_LESSON_DIR, RAIN_MODEL, RAIN_EXTRACT_MODEL
-  RAIN_EXTRACT_CONCURRENCY, RAIN_API_KEY, MIMO_TP_API_KEY
+  RAIN_EXTRACT_CONCURRENCY, MIMO_TP_API_KEY
 `);
 }
 
-export function loadApiKey(config) {
-  // 优先从 MIMO_TP_API_KEY 环境变量读取
-  if (process.env.MIMO_TP_API_KEY) {
-    const envKey = process.env.MIMO_TP_API_KEY.trim();
-    if (envKey.startsWith('tp-')) {
-      return envKey;
-    }
+export function loadApiKey() {
+  const envKey = process.env.MIMO_TP_API_KEY?.trim();
+
+  if (!envKey) {
+    throw new Error('总结功能必须设置 MIMO_TP_API_KEY 环境变量');
   }
 
-  const raw = config.apiKey || DEFAULTS.apiKey;
-
-  if (!raw) {
-    throw new Error('必须提供 --api-key 参数、设置 RAIN_API_KEY 或 MIMO_TP_API_KEY 环境变量');
+  if (!envKey.startsWith('tp-')) {
+    throw new Error('总结功能必须设置 MIMO_TP_API_KEY 环境变量，且值必须以 tp- 开头');
   }
 
-  // 直接传入 key
-  if (raw.startsWith('tp-')) {
-    return raw.trim();
-  }
-
-  // 视为文件路径
-  const keyPath = path.resolve(raw);
-  try {
-    const content = readFileSync(keyPath, 'utf-8').trim();
-    if (!content.startsWith('tp-')) {
-      throw new Error(`API Key 文件内容格式不正确: ${keyPath}`);
-    }
-    return content;
-  } catch (err) {
-    if (err.code === 'ENOENT') {
-      throw new Error(`API Key 文件不存在: ${keyPath}`);
-    }
-    throw err;
-  }
+  return envKey;
 }
 
 export function loadConfig(argv = process.argv) {

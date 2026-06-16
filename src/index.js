@@ -140,7 +140,7 @@ async function runDownload(config) {
 }
 
 async function runSummarize(config) {
-  const apiKey = loadApiKey(config);
+  const apiKey = loadApiKey();
   const client = createClient(apiKey);
 
   console.log(`开始提取笔记: ${config.courseDir}`);

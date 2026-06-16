@@ -23,7 +23,6 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
 ));
 
 // src/config.js
-var import_node_fs = require("node:fs");
 var import_node_path = __toESM(require("node:path"), 1);
 var DEFAULTS = {
   // 下载模式
@@ -52,7 +51,6 @@ var DEFAULTS = {
   model: process.env.RAIN_MODEL || "mimo-v2.5-pro",
   extractModel: process.env.RAIN_EXTRACT_MODEL || "mimo-v2.5",
   extractConcurrency: parseInt(process.env.RAIN_EXTRACT_CONCURRENCY, 10) || 2,
-  apiKey: process.env.RAIN_API_KEY || "tmp/mimo-apikey",
   forceSummary: false
 };
 function parseArgs(argv) {
@@ -131,9 +129,6 @@ function parseArgs(argv) {
       case "--extract-concurrency":
         config.extractConcurrency = parseInt(args[++i], 10) || DEFAULTS.extractConcurrency;
         break;
-      case "--api-key":
-        config.apiKey = args[++i];
-        break;
       case "--force-summary":
         config.forceSummary = true;
         break;
@@ -182,7 +177,6 @@ function showHelp() {
   --model <name>             \u603B\u7ED3\u6A21\u578B (\u9ED8\u8BA4: mimo-v2.5-pro)
   --extract-model <name>     \u56FE\u50CF\u63D0\u53D6\u6A21\u578B (\u9ED8\u8BA4: mimo-v2.5)
   --extract-concurrency <n>  \u56FE\u50CF\u63D0\u53D6\u5E76\u53D1\u6570 (\u9ED8\u8BA4: 2)
-  --api-key <path|key>       MiMo API Key \u6587\u4EF6\u8DEF\u5F84\u6216\u76F4\u63A5\u4F20\u5165 key
   --force-summary            \u5F3A\u5236\u91CD\u65B0\u751F\u6210 review.md
   -h, --help                 \u663E\u793A\u5E2E\u52A9
 
@@ -191,36 +185,18 @@ function showHelp() {
   RAIN_COURSE, RAIN_CLASSROOM_ID, RAIN_COOKIES
   RAIN_SINCE, RAIN_UNTIL, RAIN_LATEST, RAIN_LESSON_ID, RAIN_LESSON_DATE
   RAIN_COURSE_DIR, RAIN_LESSON_DIR, RAIN_MODEL, RAIN_EXTRACT_MODEL
-  RAIN_EXTRACT_CONCURRENCY, RAIN_API_KEY, MIMO_TP_API_KEY
+  RAIN_EXTRACT_CONCURRENCY, MIMO_TP_API_KEY
 `);
 }
-function loadApiKey(config) {
-  if (process.env.MIMO_TP_API_KEY) {
-    const envKey = process.env.MIMO_TP_API_KEY.trim();
-    if (envKey.startsWith("tp-")) {
-      return envKey;
-    }
+function loadApiKey() {
+  const envKey = process.env.MIMO_TP_API_KEY?.trim();
+  if (!envKey) {
+    throw new Error("\u603B\u7ED3\u529F\u80FD\u5FC5\u987B\u8BBE\u7F6E MIMO_TP_API_KEY \u73AF\u5883\u53D8\u91CF");
   }
-  const raw = config.apiKey || DEFAULTS.apiKey;
-  if (!raw) {
-    throw new Error("\u5FC5\u987B\u63D0\u4F9B --api-key \u53C2\u6570\u3001\u8BBE\u7F6E RAIN_API_KEY \u6216 MIMO_TP_API_KEY \u73AF\u5883\u53D8\u91CF");
+  if (!envKey.startsWith("tp-")) {
+    throw new Error("\u603B\u7ED3\u529F\u80FD\u5FC5\u987B\u8BBE\u7F6E MIMO_TP_API_KEY \u73AF\u5883\u53D8\u91CF\uFF0C\u4E14\u503C\u5FC5\u987B\u4EE5 tp- \u5F00\u5934");
   }
-  if (raw.startsWith("tp-")) {
-    return raw.trim();
-  }
-  const keyPath = import_node_path.default.resolve(raw);
-  try {
-    const content = (0, import_node_fs.readFileSync)(keyPath, "utf-8").trim();
-    if (!content.startsWith("tp-")) {
-      throw new Error(`API Key \u6587\u4EF6\u5185\u5BB9\u683C\u5F0F\u4E0D\u6B63\u786E: ${keyPath}`);
-    }
-    return content;
-  } catch (err) {
-    if (err.code === "ENOENT") {
-      throw new Error(`API Key \u6587\u4EF6\u4E0D\u5B58\u5728: ${keyPath}`);
-    }
-    throw err;
-  }
+  return envKey;
 }
 function loadConfig(argv = process.argv) {
   const config = parseArgs(argv);
@@ -260,7 +236,7 @@ function loadConfig(argv = process.argv) {
 }
 
 // src/manifest.js
-var import_node_fs2 = require("node:fs");
+var import_node_fs = require("node:fs");
 var URL_TEMPLATE = "https://changjiang-private-qn.yuketang.cn/slide/{slideId}/cover{coverId}_{timestamp}.jpg?e={expire}&token={token}";
 function buildSlideUrl(slideId, coverId, timestamp, expire, token) {
   return URL_TEMPLATE.replace("{slideId}", slideId).replace("{coverId}", coverId).replace("{timestamp}", timestamp).replace("{expire}", expire).replace("{token}", token);
@@ -296,9 +272,9 @@ function loadCookiesFromEnv() {
 function readManifest(source) {
   let raw;
   if (source === "-") {
-    raw = (0, import_node_fs2.readFileSync)(0, "utf-8");
+    raw = (0, import_node_fs.readFileSync)(0, "utf-8");
   } else {
-    raw = (0, import_node_fs2.readFileSync)(source, "utf-8");
+    raw = (0, import_node_fs.readFileSync)(source, "utf-8");
   }
   let manifest;
   try {
@@ -390,7 +366,7 @@ function cookieString(cookies) {
 }
 
 // src/download.js
-var import_node_fs3 = require("node:fs");
+var import_node_fs2 = require("node:fs");
 var import_promises = require("node:fs/promises");
 var import_node_path2 = __toESM(require("node:path"), 1);
 var import_promises2 = require("node:stream/promises");
@@ -416,7 +392,7 @@ async function downloadImage(url, destPath, options = {}) {
       if (!response.body) {
         throw new Error("\u54CD\u5E94\u4F53\u4E3A\u7A7A");
       }
-      const fileStream = (0, import_node_fs3.createWriteStream)(destPath);
+      const fileStream = (0, import_node_fs2.createWriteStream)(destPath);
       await (0, import_promises2.pipeline)(response.body, fileStream);
       return { success: true, path: destPath };
     } catch (err) {
@@ -899,7 +875,7 @@ async function writeLessonMeta(lessonDir, lesson, downloadResults) {
 }
 
 // src/state.js
-var import_node_fs4 = require("node:fs");
+var import_node_fs3 = require("node:fs");
 var import_node_path4 = __toESM(require("node:path"), 1);
 function countExpectedImages(presentations) {
   if (typeof presentations === "number") {
@@ -912,11 +888,11 @@ function countExpectedImages(presentations) {
 }
 function isLessonDownloaded(lessonDir, presentations) {
   const metaPath = import_node_path4.default.join(lessonDir, "meta.json");
-  if (!(0, import_node_fs4.existsSync)(metaPath)) {
+  if (!(0, import_node_fs3.existsSync)(metaPath)) {
     return false;
   }
   try {
-    const meta = JSON.parse((0, import_node_fs4.readFileSync)(metaPath, "utf-8"));
+    const meta = JSON.parse((0, import_node_fs3.readFileSync)(metaPath, "utf-8"));
     const expectedImageCount = countExpectedImages(presentations);
     const actualTotal = meta.totalImages ?? meta.imageCount ?? 0;
     return actualTotal === expectedImageCount && meta.failedCount === 0 && meta.downloadedCount > 0;
@@ -11307,7 +11283,7 @@ async function runDownload(config) {
   return { hasFailures, report };
 }
 async function runSummarize(config) {
-  const apiKey = loadApiKey(config);
+  const apiKey = loadApiKey();
   const client = createClient(apiKey);
   console.log(`\u5F00\u59CB\u63D0\u53D6\u7B14\u8BB0: ${config.courseDir}`);
   const extractionReport = await extractNotesFromCourse({
