@@ -66,13 +66,19 @@ node src/index.js --course "工程伦理概论" --cookies '{"sessionid":"...","c
 
 Agent 可通过本项目的 `SKILL.md` 自动加载工作流。首次调用时，Agent 会运行 `scripts/bootstrap.js` 自动安装依赖并调用 CLI。
 
+> **边界约束**：MCP 仅用于打开页面、检查/等待登录、提取 Cookie、处理复杂/模糊场景。构造出最小 Manifest 后必须停止 MCP，后续所有操作由脚本完成。
+
 Skill 工作流：
 
 1. 通过 chrome-devtools-mcp 连接浏览器并打开长江雨课堂。
 2. 检查登录状态；未登录时要求用户登录。
 3. 登录后自动提取 Cookie。
-4. 下载课件图片。
-5. 提取每页 Markdown 笔记并生成 `review.md`。
+4. 构造最小 Manifest，**立即停止 MCP**。
+5. 调用 `node scripts/bootstrap.js verify-auth --manifest -` 校验登录态。
+6. 调用 `node scripts/bootstrap.js --manifest - --json` 下载课件图片。
+7. 调用 `node scripts/bootstrap.js summarize --course-dir ...` 提取 Markdown 笔记并生成 `review.md`。
+
+完整接口清单与约束见 `references/yuketang-api.md`。
 
 手动使用 Manifest（可通过 stdin 避免临时文件）：
 
@@ -98,6 +104,18 @@ node src/index.js --course "算法设计与分析" --cookies ./cookies.json --ou
 
 ```bash
 node src/index.js --course "算法设计与分析" --cookies ./cookies.json --force
+```
+
+校验登录态：
+
+```bash
+cat <<'EOF' | node src/index.js verify-auth --manifest -
+{
+  "version": "1.0",
+  "courseName": "算法设计与分析",
+  "cookies": { "sessionid": "...", "csrftoken": "...", "uv_id": "2874", "university_id": "2874", "xtbz": "ykt" }
+}
+EOF
 ```
 
 输出 JSON 报告：

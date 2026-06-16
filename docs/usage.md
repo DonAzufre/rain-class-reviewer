@@ -1,5 +1,7 @@
 # 使用指南
 
+> 接口清单与约束：`references/yuketang-api.md`
+
 ## 安装
 
 ```bash
@@ -43,7 +45,7 @@ echo '{"sessionid":"..."}' | node src/index.js --course "工程伦理概论" --c
 
 ### 模式二：Agent/Skill 模式（通过 Manifest）
 
-Agent 通过 Chrome DevTools MCP 完成登录态检查、课程模糊匹配、Cookie 读取后生成 Manifest，再调用工具。Manifest 可以直接通过 stdin 传入，避免写临时文件：
+Agent 通过 Chrome DevTools MCP 完成登录态检查、Cookie 读取后生成 Manifest，再调用工具。Manifest 可以直接通过 stdin 传入，避免写临时文件：
 
 ```bash
 cat <<'EOF' | node src/index.js --manifest -
@@ -54,6 +56,8 @@ cat <<'EOF' | node src/index.js --manifest -
 }
 EOF
 ```
+
+**约束**：MCP 仅用于获取 Cookie 和处理复杂/模糊场景；构造 Manifest 后必须停止 MCP，后续由脚本完成。完整接口清单见 `references/yuketang-api.md`。
 
 ## CLI 参数
 
@@ -212,6 +216,25 @@ node src/index.js --manifest ./manifest.json --latest
   ]
 }
 ```
+
+## 校验登录态
+
+在下载前验证 Cookie 是否有效：
+
+```bash
+node src/index.js verify-auth --manifest ./manifest.json
+
+# 或从 stdin 读取
+node src/index.js verify-auth --manifest - < ./manifest.json
+```
+
+成功输出：
+
+```text
+认证有效，已发现 X 门课程
+```
+
+失败输出明确的认证错误，此时应重新获取 Cookie。
 
 ## 总结模式
 

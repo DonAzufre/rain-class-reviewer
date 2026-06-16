@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 import { loadConfig, loadApiKey } from './config.js';
-import { readManifest, validateAndNormalize, cookieString } from './manifest.js';
+import { readManifest, cookieString } from './manifest.js';
 import { downloadImage, runWithConcurrency } from './download.js';
 import { extractLessonImages } from './extract.js';
-import { discoverCourse } from './discover.js';
+import { discoverCourse, fetchCourseList } from './discover.js';
 import { filterLessons, buildLessonFilters, hasActiveLessonFilters } from './filter-lessons.js';
 import {
   getCourseDir,
@@ -19,34 +19,7 @@ import { createClient } from './llm.js';
 import { extractNotesFromCourse } from './extract-notes.js';
 import { summarizeCourse } from './summarize-course.js';
 import path from 'node:path';
-import { readFileSync } from 'node:fs';
-
-function readCookies(source) {
-  if (source === '-') {
-    return JSON.parse(readFileSync(0, 'utf-8'));
-  }
-
-  const trimmed = source.trim();
-  if (trimmed.startsWith('{')) {
-    return JSON.parse(trimmed);
-  }
-
-  const raw = readFileSync(source, 'utf-8');
-  return JSON.parse(raw);
-}
-
-function buildToolManifest(config) {
-  const cookies = readCookies(config.cookies);
-
-  return validateAndNormalize({
-    version: '1.0',
-    courseName: config.course,
-    cookies,
-    headers: {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-    },
-  });
-}
+import { runVerifyAuth, buildToolManifest } from './verify-auth.js';
 
 async function runDownload(config) {
   const manifest = config.manifest
@@ -206,6 +179,12 @@ async function runSummarize(config) {
 
 async function main() {
   const config = loadConfig();
+
+  if (config.verifyAuth) {
+    const { ok } = await runVerifyAuth(config);
+    process.exitCode = ok ? 0 : 1;
+    return;
+  }
 
   if (config.summarize) {
     const { hasFailures } = await runSummarize(config);
