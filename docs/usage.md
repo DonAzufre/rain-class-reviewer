@@ -16,10 +16,17 @@ node src/index.js --manifest ./manifest.json
 
 ### 模式一：工具模式（直接给定课程名）
 
-只需要课程名和 Cookie，工具会自动发现课程、课时并下载：
+只需要课程名和 Cookie，工具会自动发现课程、课时并下载。Cookie 可以是文件路径、JSON 字符串或从 stdin 读取：
 
 ```bash
+# Cookie 文件
 node src/index.js --course "工程伦理概论" --cookies ./cookies.json
+
+# Cookie JSON 字符串
+node src/index.js --course "工程伦理概论" --cookies '{"sessionid":"...","csrftoken":"...","uv_id":"2874","university_id":"2874","xtbz":"ykt"}'
+
+# 从 stdin 读取 Cookie
+echo '{"sessionid":"..."}' | node src/index.js --course "工程伦理概论" --cookies -
 ```
 
 `cookies.json` 示例：
@@ -28,18 +35,24 @@ node src/index.js --course "工程伦理概论" --cookies ./cookies.json
 {
   "sessionid": "...",
   "csrftoken": "...",
-  "uv_id": "...",
-  "university_id": "...",
+  "uv_id": "2874",
+  "university_id": "2874",
   "xtbz": "ykt"
 }
 ```
 
 ### 模式二：Agent/Skill 模式（通过 Manifest）
 
-Agent 通过 Chrome DevTools MCP 完成登录态检查、课程模糊匹配、Cookie 读取后生成 Manifest，再调用工具：
+Agent 通过 Chrome DevTools MCP 完成登录态检查、课程模糊匹配、Cookie 读取后生成 Manifest，再调用工具。Manifest 可以直接通过 stdin 传入，避免写临时文件：
 
 ```bash
-node src/index.js --manifest ./manifest.json
+cat <<'EOF' | node src/index.js --manifest -
+{
+  "version": "1.0",
+  "courseName": "工程伦理概论",
+  "cookies": { "sessionid": "...", "csrftoken": "...", "uv_id": "2874", "university_id": "2874", "xtbz": "ykt" }
+}
+EOF
 ```
 
 ## CLI 参数
@@ -48,7 +61,7 @@ node src/index.js --manifest ./manifest.json
 |------|------|--------|
 | `--manifest <path>` | Manifest 文件路径，`-` 表示从 stdin 读取 | 与 `--course` 二选一 |
 | `--course <name>` | 工具模式：按课程名严格匹配 | 与 `--manifest` 二选一 |
-| `--cookies <path>` | 工具模式：Cookie JSON 文件路径 | 工具模式必填 |
+| `--cookies <path\|->` | 工具模式：Cookie JSON 文件路径、JSON 字符串或 `-` 从 stdin 读取 | 工具模式必填 |
 | `--output <dir>` | 输出根目录 | `downloads` |
 | `--concurrency <n>` | 并发下载数 | 3 |
 | `--extract-concurrency <n>` | 图像提取并发数 | 2 |
@@ -247,8 +260,8 @@ node src/index.js summarize --course-dir "downloads/算法设计与分析" --for
 总结流程：
 
 1. 扫描 `--course-dir` 下的所有 `.jpg` 图片。
-2. 调用 `--extract-model` 逐页提取文字、公式、概念等结构化信息，保存到 `{courseDir}/extracted/`。
-3. 调用 `--model` 汇总所有提取结果，去重并生成 `review.md`。
+2. 调用 `--extract-model` 逐页提取文字、公式、概念等结构化信息，保存为 `{courseDir}/extracted/.../<页码>.md` Markdown 文档。
+3. 调用 `--model` 汇总所有 Markdown 笔记，去重并生成 `review.md`。
 4. 已提取页面会记录状态，中断后重新运行会自动跳过。
 
 ## 输出目录结构
@@ -261,14 +274,14 @@ node src/index.js summarize --course-dir "downloads/算法设计与分析" --for
     └── 算法设计与分析/
         ├── meta.json
         ├── review.md                      # 课程复习大纲
-        ├── extracted/                     # LLM 提取的结构化笔记
+        ├── extracted/                     # LLM 提取的 Markdown 笔记
         │   ├── state.json
         │   ├── 2024-12-24_1318590613705012608_5.2 贪心法正确性证明（2）/
         │   │   ├── 001_5.2 贪心法正确性证明/
-        │   │   │   ├── 001.json
+        │   │   │   ├── 001.md
         │   │   │   └── ...
         │   │   └── 002_《算法设计与分析》说课/
-        │   │       ├── 001.json
+        │   │       ├── 001.md
         │   │       └── ...
         │   └── ...
         ├── 2026-06-10_1704863264448235136_电子信息领域中的伦理问题（2）/

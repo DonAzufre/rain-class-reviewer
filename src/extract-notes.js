@@ -53,7 +53,24 @@ function outputPathForImage(courseDir, imagePath) {
   const relKey = imagePathToKey(courseDir, imagePath);
   const baseName = path.basename(imagePath, path.extname(imagePath));
   const dirName = path.dirname(relKey);
-  return path.join(courseDir, EXTRACTED_DIR, dirName, `${baseName}.json`);
+  return path.join(courseDir, EXTRACTED_DIR, dirName, `${baseName}.md`);
+}
+
+function buildFrontmatter(meta) {
+  const lines = ['---'];
+  for (const [key, value] of Object.entries(meta)) {
+    if (value === undefined || value === null) continue;
+    if (typeof value === 'string' && (value.includes('\n') || value.includes('"'))) {
+      lines.push(`${key}: |`);
+      for (const line of value.split('\n')) {
+        lines.push(`  ${line}`);
+      }
+    } else {
+      lines.push(`${key}: ${JSON.stringify(value)}`);
+    }
+  }
+  lines.push('---\n');
+  return lines.join('\n');
 }
 
 export async function extractNotesFromCourse({
@@ -69,7 +86,6 @@ export async function extractNotesFromCourse({
   const scanDir = lessonDir ? path.resolve(lessonDir) : resolvedCourse;
   const allImages = await findImageFiles(scanDir);
 
-  // 如果指定了 lessonDir，只保留该目录下的图片
   let images = allImages;
   if (lessonDir) {
     const resolvedLesson = path.resolve(lessonDir);
@@ -86,41 +102,46 @@ export async function extractNotesFromCourse({
     const relKey = imagePathToKey(courseDir, imagePath);
     const outputPath = outputPathForImage(courseDir, imagePath);
 
-    if (!force && state[relKey]?.status === 'done') {
+    if (!force) {
       try {
         await access(outputPath);
-        results[i] = { imagePath, relKey, outputPath, skipped: true };
-        if (onProgress) {
-          onProgress({ current: i + 1, total: images.length, relKey, skipped: true });
+        if (state[relKey]?.status === 'done') {
+          results[i] = { imagePath, relKey, outputPath, skipped: true };
+          if (onProgress) {
+            onProgress({ current: i + 1, total: images.length, relKey, skipped: true });
+          }
+          return;
         }
-        return;
       } catch {
-        // 文件缺失，重新提取
+        // 文件不存在，继续处理
       }
     }
+
+    const meta = {
+      source: relKey,
+      extractedAt: new Date().toISOString(),
+      model: extractModel,
+      status: 'done',
+      error: undefined,
+    };
+    let markdown = '';
 
     try {
       const imageBuffer = await readFile(imagePath);
       const base64 = imageBuffer.toString('base64');
-      const note = await extractFromImage(client, extractModel, base64, 'image/jpeg');
-
-      // 补充元数据
-      note._meta = {
-        source: relKey,
-        extractedAt: new Date().toISOString(),
-        model: extractModel,
-      };
-
-      await mkdir(path.dirname(outputPath), { recursive: true });
-      await writeFile(outputPath, JSON.stringify(note, null, 2), 'utf-8');
-
+      markdown = await extractFromImage(client, extractModel, base64, 'image/jpeg');
       state[relKey] = { status: 'done', outputPath: imagePathToKey(courseDir, outputPath), updatedAt: new Date().toISOString() };
       results[i] = { imagePath, relKey, outputPath, skipped: false };
     } catch (err) {
+      meta.status = 'error';
+      meta.error = err.message;
       state[relKey] = { status: 'error', error: err.message, updatedAt: new Date().toISOString() };
       results[i] = { imagePath, relKey, outputPath, skipped: false, error: err.message };
     }
 
+    await mkdir(path.dirname(outputPath), { recursive: true });
+    const content = meta.status === 'done' ? `${buildFrontmatter(meta)}${markdown}` : `${buildFrontmatter(meta)}`;
+    await writeFile(outputPath, content, 'utf-8');
     await writeState(courseDir, state);
 
     if (onProgress) {

@@ -1,6 +1,6 @@
 import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, writeFileSync, rmSync, mkdirSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, rmSync, mkdirSync, readFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { findImageFiles, extractNotesFromCourse } from '../src/extract-notes.js';
@@ -26,9 +26,20 @@ describe('extract-notes', () => {
     assert.equal(images.length, 2);
   });
 
-  it('should extract notes and skip already done', async () => {
+  it('should extract markdown notes and skip already done', async () => {
     mkdirSync(path.join(tempDir, 'lesson1'));
     writeFileSync(path.join(tempDir, 'lesson1', '001.jpg'), 'fake');
+
+    const markdown = `# 测试页
+
+## 页面类型
+content
+
+## 要点
+- 要点1
+
+## 详细总结
+详细总结内容。`;
 
     let callCount = 0;
     const client = {
@@ -39,7 +50,7 @@ describe('extract-notes', () => {
             return {
               choices: [{
                 message: {
-                  content: JSON.stringify({ title: 'a', bullets: [], pageType: 'content' }),
+                  content: markdown,
                 },
               }],
             };
@@ -55,6 +66,12 @@ describe('extract-notes', () => {
     });
     assert.equal(report1.success, 1);
     assert.equal(callCount, 1);
+
+    const outputPath = path.join(tempDir, 'extracted', 'lesson1', '001.md');
+    assert.ok(existsSync(outputPath));
+    const written = readFileSync(outputPath, 'utf-8');
+    assert.ok(written.includes('# 测试页'));
+    assert.ok(written.includes('status: "done"'));
 
     const report2 = await extractNotesFromCourse({
       client,

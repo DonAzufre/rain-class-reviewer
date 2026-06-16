@@ -6,6 +6,36 @@ const EXTRACTED_DIR = 'extracted';
 const REVIEW_FILE = 'review.md';
 const DEFAULT_CHUNK_SIZE = 60;
 
+function parseFrontmatter(raw) {
+  const match = raw.match(/^---\n([\s\S]*?)\n---\n?/);
+  if (!match) return { meta: {}, content: raw };
+
+  const meta = {};
+  const lines = match[1].split('\n');
+  let key = null;
+  for (const line of lines) {
+    const simple = line.match(/^(\w+):\s*(.*)$/);
+    if (simple) {
+      key = simple[1];
+      let value = simple[2];
+      try {
+        value = JSON.parse(value);
+      } catch {
+        // 保持字符串
+      }
+      meta[key] = value;
+      continue;
+    }
+
+    if (key && line.startsWith('  ')) {
+      const continued = line.slice(2);
+      meta[key] = meta[key] ? `${meta[key]}\n${continued}` : continued;
+    }
+  }
+
+  return { meta, content: raw.slice(match[0].length).trim() };
+}
+
 export async function findExtractedNotes(courseDir, lessonPrefix = '') {
   const notesDir = path.join(courseDir, EXTRACTED_DIR);
   const notes = [];
@@ -17,19 +47,27 @@ export async function findExtractedNotes(courseDir, lessonPrefix = '') {
       const fullPath = path.join(dir, entry.name);
       if (entry.isDirectory()) {
         await scan(fullPath);
-      } else if (entry.isFile() && entry.name.endsWith('.json') && entry.name !== 'state.json') {
+      } else if (entry.isFile() && entry.name.endsWith('.md')) {
         try {
           const raw = await readFile(fullPath, 'utf-8');
-          const note = JSON.parse(raw);
-          const source = note._meta?.source || '';
+          const { meta, content } = parseFrontmatter(raw);
+          const source = meta.source || imagePathToKey(courseDir, fullPath).replace(/\.md$/, '.jpg');
 
           if (lessonPrefix && !source.startsWith(lessonPrefix)) {
             continue;
           }
 
-          notes.push(note);
+          if (meta.status === 'error') {
+            continue;
+          }
+
+          if (!content.trim()) {
+            continue;
+          }
+
+          notes.push({ source, content });
         } catch {
-          // 跳过损坏的 JSON
+          // 跳过损坏的文件
         }
       }
     }
@@ -43,8 +81,11 @@ export async function findExtractedNotes(courseDir, lessonPrefix = '') {
     }
   }
 
-  // 按 source 路径排序，保持课程原有顺序
-  return notes.sort((a, b) => (a._meta?.source || '').localeCompare(b._meta?.source || ''));
+  return notes.sort((a, b) => a.source.localeCompare(b.source));
+}
+
+function imagePathToKey(courseDir, filePath) {
+  return path.relative(courseDir, filePath).replace(/\\/g, '/');
 }
 
 export async function summarizeCourse({
@@ -85,7 +126,7 @@ export async function summarizeCourse({
     const location = lessonPrefix
       ? `${courseDir}/extracted/${lessonPrefix}`
       : `${courseDir}/extracted/`;
-    throw new Error(`未在 ${location} 下找到提取笔记，请先执行提取阶段`);
+    throw new Error(`未在 ${location} 下找到有效 Markdown 笔记，请先执行提取阶段`);
   }
 
   const markdown = await summarizeNotesInChunks(client, model, notes, DEFAULT_CHUNK_SIZE);
@@ -123,14 +164,15 @@ async function mergeSummaries(client, model, summaries) {
   const messages = [
     {
       role: 'system',
-      content: `你是一名课程复习大纲整理专家。下面是一份课程各部分的中间摘要，请整合为一份完整、连贯、去重的 Markdown 复习大纲。
+      content: `你是一名课程复习大纲整理专家。下面是课程各部分的 Markdown 中间摘要，请整合为一份完整、连贯、去重、信息密度高的 Markdown 复习大纲。
 
 要求：
 1. 按主题/章节组织层级结构。
 2. 合并重复概念，保留不同角度的解释和示例。
 3. 突出定义、定理、算法、例题、易错点。
-4. 使用中文。
-5. 输出纯 Markdown，不要代码块包裹。`,
+4. 保留关键细节，不要过度压缩。
+5. 使用中文。
+6. 输出纯 Markdown，不要代码块包裹。`,
     },
     {
       role: 'user',

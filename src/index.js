@@ -21,9 +21,22 @@ import { summarizeCourse } from './summarize-course.js';
 import path from 'node:path';
 import { readFileSync } from 'node:fs';
 
+function readCookies(source) {
+  if (source === '-') {
+    return JSON.parse(readFileSync(0, 'utf-8'));
+  }
+
+  const trimmed = source.trim();
+  if (trimmed.startsWith('{')) {
+    return JSON.parse(trimmed);
+  }
+
+  const raw = readFileSync(source, 'utf-8');
+  return JSON.parse(raw);
+}
+
 function buildToolManifest(config) {
-  const raw = readFileSync(config.cookies, 'utf-8');
-  const cookies = JSON.parse(raw);
+  const cookies = readCookies(config.cookies);
 
   return validateAndNormalize({
     version: '1.0',

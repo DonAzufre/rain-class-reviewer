@@ -52,48 +52,48 @@ function buildImageContent(base64, mimeType = 'image/jpeg') {
   };
 }
 
-function parseJsonResponse(content) {
-  if (!content) {
+function ensureNonEmpty(content) {
+  if (!content || !content.trim()) {
     throw new Error('LLM 返回空内容');
   }
-
-  // 尝试直接解析
-  try {
-    return JSON.parse(content);
-  } catch {
-    // 尝试从 Markdown 代码块中提取
-    const match = content.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-    if (match) {
-      try {
-        return JSON.parse(match[1]);
-      } catch {
-        // fall through
-      }
-    }
-  }
-
-  throw new Error(`LLM 返回非 JSON: ${content.slice(0, 200)}`);
+  return content.trim();
 }
 
-const EXTRACTION_PROMPT = `你是一名优秀的课程笔记整理助手。请仔细识别这张幻灯片中的所有信息，并输出为严格合法的 JSON。
+const EXTRACTION_PROMPT = `你是一名优秀的课程笔记整理助手。请仔细识别这张幻灯片中的所有信息，并输出为结构化的 Markdown 笔记。
 
 要求：
 1. 提取所有可见文字，包括标题、正文、公式、代码、标注。
 2. 若包含图表，描述图表类型和关键数据/趋势。
 3. 识别页面类型：cover（封面）、content（正文）、formula（公式推导）、diagram（图表）、summary（总结）、exercise（例题/练习）、unknown（未知）。
 4. 用中文输出。
-5. 输出必须且只能是 JSON，不要任何解释。
+5. 输出纯 Markdown，不要任何解释，不要用代码块包裹全文。
 
-JSON 格式：
-{
-  "title": "幻灯片标题（若无则为空字符串）",
-  "bullets": ["要点1", "要点2", ...],
-  "formulas": ["公式1", ...],
-  "keywords": ["关键词1", ...],
-  "concepts": ["核心概念1", ...],
-  "summary": "用1-3句话概括本页核心内容",
-  "pageType": "content"
-}`;
+必须包含以下章节：
+
+# 幻灯片标题（若无则为空）
+
+## 页面类型
+页面类型，只能是 cover / content / formula / diagram / summary / exercise / unknown 之一。
+
+## 要点
+- 要点 1
+- 要点 2
+...
+
+## 公式
+- 公式 1（LaTeX 或纯文本）
+...
+
+## 关键词
+- 关键词 1
+...
+
+## 核心概念
+- 核心概念 1
+...
+
+## 详细总结
+用多段落详细概括本页内容，保留定义、推理过程、示例、图表趋势、易错点等所有有效信息。不要只写 1-3 句话；尽量覆盖幻灯片上出现的全部知识点。`;
 
 export async function extractFromImage(client, model, imageBase64, mimeType = 'image/jpeg', retry = DEFAULT_RETRIES) {
   const response = await callWithRetry(() => client.chat.completions.create({
@@ -111,17 +111,18 @@ export async function extractFromImage(client, model, imageBase64, mimeType = 'i
   }), retry);
 
   const content = response.choices[0]?.message?.content;
-  return parseJsonResponse(content);
+  return ensureNonEmpty(content);
 }
 
-const SUMMARY_PROMPT = `你是一名课程复习大纲生成专家。下面是一系列幻灯片提取出的结构化笔记，请跨页面去重、整合，生成一份完整的 Markdown 复习大纲。
+const SUMMARY_PROMPT = `你是一名课程复习大纲生成专家。下面是一系列幻灯片的 Markdown 笔记，请跨页面去重、整合，生成一份完整、详细、信息密度高的 Markdown 复习大纲。
 
 要求：
 1. 按课程主题/章节组织层级结构。
 2. 合并重复概念，保留不同角度的解释和示例。
 3. 突出定义、定理、算法、例题、易错点。
-4. 使用中文。
-5. 输出纯 Markdown，不要代码块包裹。
+4. 保留每页详细总结中的关键细节，不要过度压缩。
+5. 使用中文。
+6. 输出纯 Markdown，不要代码块包裹。
 
 输出格式示例：
 # 课程复习大纲
@@ -129,12 +130,14 @@ const SUMMARY_PROMPT = `你是一名课程复习大纲生成专家。下面是�
 ## 第一章 xxx
 ### 1.1 xxx
 - 要点...
+- 详细解释...
 
 ## 第二章 xxx
 ...`;
 
 export async function summarizeNotes(client, model, notes, retry = DEFAULT_RETRIES) {
-  const notesText = JSON.stringify(notes, null, 2);
+  // notes 是 { source, content } 数组
+  const notesText = notes.map((n) => `<!-- source: ${n.source} -->\n\n${n.content}`).join('\n\n---\n\n');
 
   const response = await callWithRetry(() => client.chat.completions.create({
     model,
@@ -145,7 +148,7 @@ export async function summarizeNotes(client, model, notes, retry = DEFAULT_RETRI
       },
       {
         role: 'user',
-        content: `以下是幻灯片提取笔记：\n\n${notesText}`,
+        content: `以下是幻灯片 Markdown 笔记：\n\n${notesText}`,
       },
     ],
     temperature: 0.3,

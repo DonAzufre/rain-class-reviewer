@@ -25,43 +25,54 @@ function createFakeClient(responseContent, options = {}) {
 }
 
 describe('llm', () => {
-  it('should extract structured note from image', async () => {
-    const note = {
-      title: '测试标题',
-      bullets: ['要点1', '要点2'],
-      formulas: [],
-      keywords: ['关键词'],
-      concepts: ['概念'],
-      summary: '总结',
-      pageType: 'content',
-    };
+  it('should extract markdown note from image', async () => {
+    const markdown = `# 测试标题
 
-    const client = createFakeClient(JSON.stringify(note));
+## 页面类型
+content
+
+## 要点
+- 要点1
+- 要点2
+
+## 详细总结
+这是详细总结的第一段。这是第二段。`;
+
+    const client = createFakeClient(markdown);
     const result = await extractFromImage(client, 'mimo-v2.5', 'base64data');
 
-    assert.equal(result.title, '测试标题');
-    assert.equal(result.bullets.length, 2);
+    assert.ok(result.includes('# 测试标题'));
+    assert.ok(result.includes('## 页面类型'));
+    assert.ok(result.includes('## 详细总结'));
   });
 
-  it('should extract JSON from markdown code block', async () => {
-    const note = { title: '代码块', bullets: [], pageType: 'cover' };
-    const client = createFakeClient(`\`\`\`json\n${JSON.stringify(note)}\n\`\`\``);
+  it('should keep markdown code block content as-is', async () => {
+    const markdown = `# 代码块标题
+\`\`\`json
+{"a": 1}
+\`\`\`
+
+## 详细总结
+包含代码块。`;
+
+    const client = createFakeClient(markdown);
     const result = await extractFromImage(client, 'mimo-v2.5', 'base64data');
 
-    assert.equal(result.title, '代码块');
+    assert.ok(result.includes('# 代码块标题'));
+    assert.ok(result.includes('{"a": 1}'));
   });
 
-  it('should throw on non-json response', async () => {
-    const client = createFakeClient('这不是 JSON');
+  it('should throw on empty response', async () => {
+    const client = createFakeClient('');
     await assert.rejects(
       () => extractFromImage(client, 'mimo-v2.5', 'base64data'),
-      /非 JSON/
+      /空内容/
     );
   });
 
   it('should summarize notes to markdown', async () => {
     const client = createFakeClient('# 复习大纲\n\n## 第一章\n- 要点');
-    const result = await summarizeNotes(client, 'mimo-v2.5-pro', [{ title: 'a' }]);
+    const result = await summarizeNotes(client, 'mimo-v2.5-pro', [{ source: 'a.jpg', content: '# 笔记\n内容' }]);
 
     assert.ok(result.includes('# 复习大纲'));
   });
@@ -69,16 +80,22 @@ describe('llm', () => {
   it('should throw on empty summary response', async () => {
     const client = createFakeClient('');
     await assert.rejects(
-      () => summarizeNotes(client, 'mimo-v2.5-pro', [{ title: 'a' }]),
+      () => summarizeNotes(client, 'mimo-v2.5-pro', [{ source: 'a.jpg', content: '内容' }]),
       /空内容/
     );
   });
 
   it('should retry on 429 rate limit', async () => {
-    const note = { title: 'retry', bullets: [], pageType: 'content' };
-    const client = createFakeClient(JSON.stringify(note), { fail429Times: 1 });
+    const markdown = `# retry
+
+## 页面类型
+content
+
+## 详细总结
+retry 测试。`;
+    const client = createFakeClient(markdown, { fail429Times: 1 });
     const result = await extractFromImage(client, 'mimo-v2.5', 'base64', 'image/jpeg', 3);
-    assert.equal(result.title, 'retry');
+    assert.ok(result.includes('# retry'));
   });
 
   it('should throw after exhausting 429 retries', async () => {

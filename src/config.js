@@ -137,7 +137,7 @@ function showHelp() {
   -f, --force                强制重新下载已存在课时
   -j, --json                 输出 JSON 结果
   --course <name>            工具模式：按课程名严格匹配并自动发现
-  --cookies <path>           工具模式：Cookie JSON 文件路径
+  --cookies <path|->         工具模式：Cookie JSON 文件路径，使用 - 从 stdin 读取，或直接传入 JSON 字符串
   --since <date>             只下载该日期及之后的课时 (YYYY-MM-DD)
   --until <date>             只下载该日期及之前的课时 (YYYY-MM-DD)
   --latest                   只下载最新一次课时

@@ -4,10 +4,12 @@
 
 主要特性：
 
+- 通过 chrome-devtools-mcp 自动获取登录 Cookie，无需手动输入。
 - 自动发现课程与课时，支持一次课堂多个 PPT。
 - 保留同一天多次课堂活动，不再按日期合并。
 - 优先下载完整 PPT 幻灯片（含未在课堂展示的页面）。
 - 支持按日期、课时 ID 等条件指定下载范围。
+- 每页 PPT 生成详细的 Markdown 笔记，最终整合为 `review.md` 复习大纲。
 - 断点续传：已下载课时自动跳过，支持 `--force` 强制重下。
 
 ## 作为 Agent Skill 安装
@@ -25,6 +27,8 @@ npx skills add DonAzufre/rain-class-reviewer
 帮我总结工程伦理概论的复习大纲
 ```
 
+Skill 会通过 chrome-devtools-mcp 自动连接浏览器、检查登录状态、提取 Cookie 并完成下载与总结。
+
 ## 快速开始
 
 ### 安装
@@ -37,10 +41,13 @@ Node.js ≥ 18 即可运行，无需浏览器自动化。
 
 ### 工具模式
 
-提供课程名和 Cookie，工具自动完成后续步骤：
+提供课程名和 Cookie，工具自动完成后续步骤。Cookie 可以是文件路径、JSON 字符串或从 stdin 读取：
 
 ```bash
 node src/index.js --course "工程伦理概论" --cookies ./cookies.json
+
+# 或直接把 JSON 字符串作为参数
+node src/index.js --course "工程伦理概论" --cookies '{"sessionid":"...","csrftoken":"...","uv_id":"2874","university_id":"2874","xtbz":"ykt"}'
 ```
 
 `cookies.json` 至少包含 `sessionid`：
@@ -49,8 +56,8 @@ node src/index.js --course "工程伦理概论" --cookies ./cookies.json
 {
   "sessionid": "...",
   "csrftoken": "...",
-  "uv_id": "...",
-  "university_id": "...",
+  "uv_id": "2874",
+  "university_id": "2874",
   "xtbz": "ykt"
 }
 ```
@@ -59,10 +66,24 @@ node src/index.js --course "工程伦理概论" --cookies ./cookies.json
 
 Agent 可通过本项目的 `SKILL.md` 自动加载工作流。首次调用时，Agent 会运行 `scripts/bootstrap.js` 自动安装依赖并调用 CLI。
 
-手动使用 Manifest：
+Skill 工作流：
+
+1. 通过 chrome-devtools-mcp 连接浏览器并打开长江雨课堂。
+2. 检查登录状态；未登录时要求用户登录。
+3. 登录后自动提取 Cookie。
+4. 下载课件图片。
+5. 提取每页 Markdown 笔记并生成 `review.md`。
+
+手动使用 Manifest（可通过 stdin 避免临时文件）：
 
 ```bash
-node src/index.js --manifest ./manifest.json
+cat <<'EOF' | node src/index.js --manifest -
+{
+  "version": "1.0",
+  "courseName": "工程伦理概论",
+  "cookies": { "sessionid": "...", "csrftoken": "...", "uv_id": "2874", "university_id": "2874", "xtbz": "ykt" }
+}
+EOF
 ```
 
 ## 示例
