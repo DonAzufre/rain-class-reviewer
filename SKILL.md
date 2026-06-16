@@ -36,14 +36,18 @@ disableModelInvocation: false
 
 ### 最小 Manifest 构造后必须停止 MCP
 
-一旦你通过 MCP 拿到 Cookie 并构造出最小 Manifest（包含 `version`、`courseName`、`cookies`），**立即停止所有 chrome-devtools-mcp 操作**。后续步骤必须交给脚本：
+一旦你通过 MCP 拿到 Cookie，**立即停止所有 chrome-devtools-mcp 操作**。Cookie 只能通过 `RAIN_COOKIES` 环境变量传给脚本，Manifest 文件只保留课程信息。后续步骤必须交给脚本：
+
+```bash
+set RAIN_COOKIES={"sessionid":"...","csrftoken":"...","uv_id":"0","university_id":"0","xtbz":"ykt"}
+```
 
 1. `node <skill-path>/scripts/bootstrap.js verify-auth --manifest <skill-path>/tmp/manifest.json` 校验登录态。
 2. `node <skill-path>/scripts/bootstrap.js list-courses --manifest <skill-path>/tmp/manifest.json --json` 获取课程列表。
 3. `node <skill-path>/scripts/bootstrap.js --manifest <skill-path>/tmp/manifest.json --json` 下载课件（默认输出到项目根目录的 `rain-class-reviewer-downloads/`）。
 4. `node <skill-path>/scripts/bootstrap.js summarize --course-dir "rain-class-reviewer-downloads/<课程名>" --force-summary` 提取笔记并生成复习大纲。
 
-> 为兼容 Claude Code auto mode 的安全策略，**不要把 Manifest 通过 stdin 传入**。把最终 Manifest 写入 Skill 目录下的 `tmp/manifest.json`（覆盖写入），并在命令中通过路径引用。`tmp/` 已在 `.gitignore` 中，不会进入版本控制。
+> 为兼容 Claude Code auto mode 的安全策略，**不要把 Manifest 通过 stdin 传入，也不要在 Manifest 文件中写 Cookie**。把最终 Manifest 写入 Skill 目录下的 `tmp/manifest.json`（覆盖写入），并在命令中通过路径引用；Cookie 通过 `RAIN_COOKIES` 环境变量传入。`tmp/` 已在 `.gitignore` 中，不会进入版本控制。
 
 只有在脚本明确报告需要人工处理（如验证码、需要用户在浏览器里点选）时，才允许再次启用 MCP，且处理完后必须立刻回到脚本流程。
 
@@ -153,22 +157,22 @@ sessionid=abc123; csrftoken=xyz789; uv_id=0; university_id=0; xtbz=ykt
 ```json
 {
   "version": "1.0",
-  "courseName": "计算机网络",
-  "cookies": {
-    "sessionid": "...",
-    "csrftoken": "...",
-    "uv_id": "0",
-    "university_id": "0",
-    "xtbz": "ykt"
-  }
+  "courseName": "计算机网络"
 }
 ```
 
 `courseName` 使用用户原始输入。此 Manifest 只用于校验和获取课程列表，不保证最终匹配。**构造完此 Manifest 后，立即停止 MCP。**
 
+Cookie 通过 `RAIN_COOKIES` 环境变量传入（下同）：
+
+```bash
+set RAIN_COOKIES={"sessionid":"...","csrftoken":"...","uv_id":"0","university_id":"0","xtbz":"ykt"}
+```
+
 ### 4. 校验登录态
 
 ```bash
+set RAIN_COOKIES={...}
 node <skill-path>/scripts/bootstrap.js verify-auth --manifest <skill-path>/tmp/manifest.json
 ```
 
@@ -178,6 +182,7 @@ node <skill-path>/scripts/bootstrap.js verify-auth --manifest <skill-path>/tmp/m
 ### 5. 获取课程列表
 
 ```bash
+set RAIN_COOKIES={...}
 node <skill-path>/scripts/bootstrap.js list-courses --manifest <skill-path>/tmp/manifest.json --json
 ```
 
@@ -197,14 +202,14 @@ node <skill-path>/scripts/bootstrap.js list-courses --manifest <skill-path>/tmp/
 {
   "version": "1.0",
   "courseName": "计算机网络",
-  "classroomId": "13522533",
-  "cookies": { ... }
+  "classroomId": "13522533"
 }
 ```
 
 ### 7. 下载课件
 
 ```bash
+set RAIN_COOKIES={...}
 node <skill-path>/scripts/bootstrap.js --manifest <skill-path>/tmp/manifest.json --json
 ```
 
@@ -245,45 +250,27 @@ node <skill-path>/scripts/bootstrap.js --manifest <skill-path>/tmp/manifest.json
 
 1. 说明 `sessionid` 已过期或缺失。
 2. 重新执行步骤 2（使用 MCP 检查/重新登录）。
-3. 更新 Manifest 中的 Cookie。
+3. 更新 `RAIN_COOKIES` 环境变量。
 4. 重新运行脚本。
 
 ## Claude Code 自动模式特别说明
 
-Claude Code 的 **auto mode** 会把“写入包含 Cookie 等凭据的文件”判定为高风险操作（属于 Tier 3 行为），因此直接 `Write(tmp/manifest.json)` 可能被 classifier 拒绝。
+本 Skill 的 Manifest 文件**不再包含 Cookie 等凭据**；Cookie 只能通过 `RAIN_COOKIES` 环境变量传递。因此 `Write(tmp/manifest.json)` 只写入课程名/classroomId，通常可以通过 auto mode 的文件写入检查。
 
-如果用户正在使用 auto mode，推荐以下两种规避方式：
-
-### 方式一：配置项目级权限策略（推荐）
-
-在当前项目根目录创建 `.claude/policy.json`，显式声明允许 rain-class-reviewer 的临时文件写入和脚本执行：
+如果 auto mode 仍然拦截写入临时文件，可在当前项目根目录手动创建 `.claude/policy.json`：
 
 ```json
 {
   "autoMode": {
     "allow": [
-      "Allow writing the rain-class-reviewer skill manifest file at .claude/skills/rain-class-reviewer/tmp/manifest.json, which temporarily stores login cookies for the yuketang API.",
+      "Allow writing the rain-class-reviewer skill manifest file at .claude/skills/rain-class-reviewer/tmp/manifest.json, which only contains course name and classroomId.",
       "Allow running node .claude/skills/rain-class-reviewer/scripts/bootstrap.js commands for course download and summarization."
     ]
   }
 }
 ```
 
-创建该文件需要用户手动完成（auto mode 通常不允许 Agent 自行修改权限配置）。
-
-### 方式二：Manifest 不写 Cookie，改走环境变量
-
-把 Cookie 从 Manifest 中分离，Manifest 文件只保留 `version`、`courseName`、`classroomId`：
-
-```json
-{
-  "version": "1.0",
-  "courseName": "计算机网络",
-  "classroomId": "13522533"
-}
-```
-
-执行命令时通过 `RAIN_COOKIES` 环境变量传入 Cookie：
+所有命令都应附带 `RAIN_COOKIES` 环境变量：
 
 ```bash
 set RAIN_COOKIES={"sessionid":"...","csrftoken":"...","uv_id":"0","university_id":"0","xtbz":"ykt"}
@@ -291,13 +278,12 @@ node .claude/skills/rain-class-reviewer/scripts/bootstrap.js verify-auth --manif
 ```
 
 > Git Bash / Linux / macOS 使用 `export RAIN_COOKIES='...'`。
-> 这样 Manifest 文件不含敏感信息，通常可以通过 auto mode 的文件写入检查。
 
 ## 安全与隐私
 
 - **禁止在对话中明文输出完整 Cookie**。
-- Manifest 写入 Skill 目录下的 `tmp/manifest.json`，覆盖之前的内容；`tmp/` 已在 `.gitignore` 中，不会进入版本控制。
-- Cookie 应仅在 Manifest 或 `RAIN_COOKIES` 环境变量中传递，不要单独保存 `cookies.json`。
+- Manifest 写入 Skill 目录下的 `tmp/manifest.json`，覆盖之前的内容；Manifest 中**不得包含 cookies 字段**。`tmp/` 已在 `.gitignore` 中，不会进入版本控制。
+- Cookie 只能通过 `RAIN_COOKIES` 环境变量传递，不要单独保存 `cookies.json`。
 - 下载目录 `rain-class-reviewer-downloads/` 和临时目录 `tmp/` 已在 `.gitignore` 中。
 
 ## 已知限制

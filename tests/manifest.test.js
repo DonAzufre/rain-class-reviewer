@@ -1,4 +1,4 @@
-import { describe, it } from 'node:test';
+import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -6,11 +6,18 @@ import path from 'node:path';
 import { validateAndNormalize, cookieString, readManifest } from '../src/manifest.js';
 
 describe('manifest', () => {
+  beforeEach(() => {
+    process.env.RAIN_COOKIES = JSON.stringify({ sessionid: 'abc' });
+  });
+
+  afterEach(() => {
+    delete process.env.RAIN_COOKIES;
+  });
+
   it('should validate full-url manifest and convert images to single presentation', () => {
     const manifest = {
       courseName: 'Test Course',
       classroomId: '123',
-      cookies: { sessionid: 'abc' },
       lessons: [{
         lessonId: 'l1',
         date: '2025-01-01',
@@ -30,7 +37,6 @@ describe('manifest', () => {
     const manifest = {
       courseName: 'Test Course',
       classroomId: '123',
-      cookies: { sessionid: 'abc' },
       lessons: [{
         lessonId: 'l1',
         presentations: [
@@ -49,7 +55,6 @@ describe('manifest', () => {
     const manifest = {
       courseName: 'Test Course',
       classroomId: '123',
-      cookies: { sessionid: 'abc' },
       lessons: [{
         lessonId: 'l1',
         slideManifest: {
@@ -74,7 +79,6 @@ describe('manifest', () => {
     const manifest = {
       courseName: 'Test Course',
       classroomId: '123',
-      cookies: { sessionid: 'abc' },
       lessons: [{
         lessonId: 'l1',
         date: '2025-01-01',
@@ -97,7 +101,6 @@ describe('manifest', () => {
     const manifest = {
       courseName: 'Test Course',
       classroomId: '123',
-      cookies: { sessionid: 'abc' },
     };
 
     validateAndNormalize(manifest);
@@ -109,7 +112,6 @@ describe('manifest', () => {
   it('should mark full discovery when neither classroomId nor lessons provided', () => {
     const manifest = {
       courseName: 'Test Course',
-      cookies: { sessionid: 'abc' },
     };
 
     validateAndNormalize(manifest);
@@ -118,7 +120,28 @@ describe('manifest', () => {
     assert.deepEqual(manifest.lessons, []);
   });
 
-  it('should read cookies from RAIN_COOKIES env var when manifest omits cookies', () => {
+  it('should reject manifest containing cookies field', () => {
+    const manifest = {
+      courseName: 'Test Course',
+      classroomId: '123',
+      cookies: { sessionid: 'abc' },
+    };
+
+    assert.throws(() => validateAndNormalize(manifest), /RAIN_COOKIES/);
+  });
+
+  it('should read cookies from RAIN_COOKIES env var', () => {
+    process.env.RAIN_COOKIES = JSON.stringify({ sessionid: 'env-session' });
+    const manifest = {
+      courseName: 'Test Course',
+      classroomId: '123',
+    };
+
+    validateAndNormalize(manifest);
+    assert.equal(manifest.cookies.sessionid, 'env-session');
+  });
+
+  it('should read cookies from RAIN_COOKIES env var via readManifest', () => {
     const tempDir = mkdtempSync(path.join(tmpdir(), 'rain-manifest-'));
     const manifestPath = path.join(tempDir, 'manifest.json');
     writeFileSync(manifestPath, JSON.stringify({ version: '1.0', courseName: 'Env Course' }), 'utf-8');
@@ -128,7 +151,6 @@ describe('manifest', () => {
       const manifest = readManifest(manifestPath);
       assert.equal(manifest.cookies.sessionid, 'env-session');
     } finally {
-      delete process.env.RAIN_COOKIES;
       rmSync(tempDir, { recursive: true, force: true });
     }
   });

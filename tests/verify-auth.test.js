@@ -36,10 +36,18 @@ describe('verify-auth run', () => {
 
   beforeEach(() => {
     originalFetch = global.fetch;
+    process.env.RAIN_COOKIES = JSON.stringify({
+      sessionid: 's',
+      csrftoken: 'c',
+      uv_id: '0',
+      university_id: '0',
+      xtbz: 'ykt',
+    });
   });
 
   afterEach(() => {
     global.fetch = originalFetch;
+    delete process.env.RAIN_COOKIES;
   });
 
   it('should report ok when course list succeeds', async () => {
@@ -55,8 +63,6 @@ describe('verify-auth run', () => {
       'verify-auth',
       '--course',
       'A',
-      '--cookies',
-      '{"sessionid":"s","csrftoken":"c","uv_id":"2874","university_id":"2874","xtbz":"ykt"}',
     ]);
 
     const result = await runVerifyAuth(config);
@@ -76,8 +82,6 @@ describe('verify-auth run', () => {
       'verify-auth',
       '--course',
       'A',
-      '--cookies',
-      '{"sessionid":"bad","csrftoken":"c","uv_id":"2874","university_id":"2874","xtbz":"ykt"}',
     ]);
 
     const result = await runVerifyAuth(config);
@@ -106,8 +110,6 @@ describe('verify-auth run', () => {
       'list-courses',
       '--course',
       'A',
-      '--cookies',
-      '{"sessionid":"s","csrftoken":"c","uv_id":"2874","university_id":"2874","xtbz":"ykt"}',
     ]);
 
     const result = await runListCourses(config);

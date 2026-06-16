@@ -11,7 +11,6 @@ const DEFAULTS = {
   json: false,
   course: process.env.RAIN_COURSE || undefined,
   classroomId: process.env.RAIN_CLASSROOM_ID || undefined,
-  cookies: process.env.RAIN_COOKIES || undefined,
 
   // 课时过滤
   since: process.env.RAIN_SINCE || undefined,
@@ -84,9 +83,6 @@ function parseArgs(argv) {
       case '--classroom-id':
         config.classroomId = args[++i];
         break;
-      case '--cookies':
-        config.cookies = args[++i];
-        break;
       case '--since':
         config.since = args[++i];
         break;
@@ -157,7 +153,6 @@ function showHelp() {
   -j, --json                 输出 JSON 结果
   --course <name>            工具模式：按课程名严格匹配并自动发现
   --classroom-id <id>        工具模式：直接指定 classroomId（可配合 --course 使用）
-  --cookies <path|->         工具模式：Cookie JSON 文件路径，使用 - 从 stdin 读取，或直接传入 JSON 字符串
   --since <date>             只下载该日期及之后的课时 (YYYY-MM-DD)
   --until <date>             只下载该日期及之前的课时 (YYYY-MM-DD)
   --latest                   只下载最新一次课时
@@ -239,16 +234,18 @@ export function loadConfig(argv = process.argv) {
     return config;
   }
 
+  const hasCookies = Boolean(process.env.RAIN_COOKIES);
+
   // 认证校验 / 课程列表模式校验
   if (config.verifyAuth || config.listCourses) {
     const hasManifest = Boolean(config.manifest);
     const hasToolMode = Boolean(config.course);
 
     if (!hasManifest && !hasToolMode) {
-      throw new Error(`${config.verifyAuth ? 'verify-auth' : 'list-courses'} 子命令必须提供 --manifest 或 --course（及 --cookies）`);
+      throw new Error(`${config.verifyAuth ? 'verify-auth' : 'list-courses'} 子命令必须提供 --manifest 或 --course（及 RAIN_COOKIES 环境变量）`);
     }
-    if (hasToolMode && !config.cookies) {
-      throw new Error(`${config.verifyAuth ? 'verify-auth' : 'list-courses'} 工具模式必须提供 --cookies`);
+    if (hasToolMode && !hasCookies) {
+      throw new Error(`${config.verifyAuth ? 'verify-auth' : 'list-courses'} 工具模式必须设置 RAIN_COOKIES 环境变量`);
     }
     return config;
   }
@@ -261,8 +258,8 @@ export function loadConfig(argv = process.argv) {
     throw new Error('必须提供 --manifest 参数或 --course 参数（或对应环境变量），或使用 summarize/verify-auth/list-courses 子命令');
   }
 
-  if (hasToolMode && !config.cookies) {
-    throw new Error('工具模式 (--course) 必须提供 --cookies 参数或 RAIN_COOKIES 环境变量');
+  if (hasToolMode && !hasCookies) {
+    throw new Error('工具模式 (--course) 必须设置 RAIN_COOKIES 环境变量');
   }
 
   return config;

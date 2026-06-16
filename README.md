@@ -41,28 +41,20 @@ Node.js ≥ 18 即可运行，无需浏览器自动化。
 
 ### 工具模式
 
-提供课程名和 Cookie，工具自动完成后续步骤。Cookie 可以是文件路径或 JSON 字符串：
+提供课程名，Cookie 通过 `RAIN_COOKIES` 环境变量传入：
 
 ```bash
-node src/index.js --course "工程伦理概论" --cookies ./cookies.json
+# Windows CMD
+set RAIN_COOKIES={"sessionid":"...","csrftoken":"...","uv_id":"0","university_id":"0","xtbz":"ykt"}
+node src/index.js --course "工程伦理概论"
 
-# 或直接把 JSON 字符串作为参数
-node src/index.js --course "工程伦理概论" --cookies '{"sessionid":"...","csrftoken":"...","uv_id":"0","university_id":"0","xtbz":"ykt"}'
+# Git Bash / Linux / macOS
+export RAIN_COOKIES='{"sessionid":"...","csrftoken":"...","uv_id":"0","university_id":"0","xtbz":"ykt"}'
+node src/index.js --course "工程伦理概论"
 
 # 直接指定 classroomId（跳过课程名匹配）
-node src/index.js --course "工程伦理概论" --classroom-id "13522533" --cookies ./cookies.json
-```
-
-`cookies.json` 至少包含 `sessionid`：
-
-```json
-{
-  "sessionid": "...",
-  "csrftoken": "...",
-  "uv_id": "0",
-  "university_id": "0",
-  "xtbz": "ykt"
-}
+set RAIN_COOKIES={...}
+node src/index.js --course "工程伦理概论" --classroom-id "13522533"
 ```
 
 ### Agent / Skill 模式
@@ -85,9 +77,10 @@ Skill 工作流：
 
 完整接口清单、Cookie 提取细节与约束见 `references/yuketang-api.md` 和 `SKILL.md`。
 
-手动使用 Manifest：
+手动使用 Manifest（Cookie 仍通过 `RAIN_COOKIES` 环境变量）：
 
 ```bash
+set RAIN_COOKIES={...}
 node src/index.js --manifest ./manifest.json
 ```
 
@@ -96,23 +89,28 @@ node src/index.js --manifest ./manifest.json
 ```json
 {
   "version": "1.0",
-  "courseName": "工程伦理概论",
-  "cookies": { "sessionid": "...", "csrftoken": "...", "uv_id": "0", "university_id": "0", "xtbz": "ykt" }
+  "courseName": "工程伦理概论"
 }
 ```
 
 ## 示例
 
+以下示例默认已设置 `RAIN_COOKIES` 环境变量：
+
+```bash
+set RAIN_COOKIES={"sessionid":"...","csrftoken":"...","uv_id":"0","university_id":"0","xtbz":"ykt"}
+```
+
 下载指定课程到 `rain-class-reviewer-downloads/`（默认输出目录）：
 
 ```bash
-node src/index.js --course "算法设计与分析" --cookies ./cookies.json
+node src/index.js --course "算法设计与分析"
 ```
 
 强制重新下载：
 
 ```bash
-node src/index.js --course "算法设计与分析" --cookies ./cookies.json --force
+node src/index.js --course "算法设计与分析" --force
 ```
 
 校验登录态：
@@ -130,32 +128,31 @@ node src/index.js list-courses --manifest ./manifest.json --json
 输出 JSON 报告：
 
 ```bash
-node src/index.js --course "算法设计与分析" --cookies ./cookies.json --json
+node src/index.js --course "算法设计与分析" --json
 ```
 
 只下载最新一次课：
 
 ```bash
-node src/index.js --course "算法设计与分析" --cookies ./cookies.json --latest
+node src/index.js --course "算法设计与分析" --latest
 ```
 
 下载指定日期之后的课：
 
 ```bash
-node src/index.js --course "算法设计与分析" --cookies ./cookies.json --since 2026-06-01
+node src/index.js --course "算法设计与分析" --since 2026-06-01
 ```
 
 下载指定课时：
 
 ```bash
-node src/index.js --course "算法设计与分析" --cookies ./cookies.json \
-  --lesson-id 1318590613705012608
+node src/index.js --course "算法设计与分析" --lesson-id 1318590613705012608
 ```
 
 直接指定 classroomId 下载：
 
 ```bash
-node src/index.js --course "算法设计与分析" --classroom-id "13522533" --cookies ./cookies.json
+node src/index.js --course "算法设计与分析" --classroom-id "13522533"
 ```
 
 生成复习大纲（下载完成后）：

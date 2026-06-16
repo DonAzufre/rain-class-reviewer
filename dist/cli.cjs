@@ -35,7 +35,6 @@ var DEFAULTS = {
   json: false,
   course: process.env.RAIN_COURSE || void 0,
   classroomId: process.env.RAIN_CLASSROOM_ID || void 0,
-  cookies: process.env.RAIN_COOKIES || void 0,
   // 课时过滤
   since: process.env.RAIN_SINCE || void 0,
   until: process.env.RAIN_UNTIL || void 0,
@@ -101,9 +100,6 @@ function parseArgs(argv) {
         break;
       case "--classroom-id":
         config.classroomId = args[++i];
-        break;
-      case "--cookies":
-        config.cookies = args[++i];
         break;
       case "--since":
         config.since = args[++i];
@@ -173,7 +169,6 @@ function showHelp() {
   -j, --json                 \u8F93\u51FA JSON \u7ED3\u679C
   --course <name>            \u5DE5\u5177\u6A21\u5F0F\uFF1A\u6309\u8BFE\u7A0B\u540D\u4E25\u683C\u5339\u914D\u5E76\u81EA\u52A8\u53D1\u73B0
   --classroom-id <id>        \u5DE5\u5177\u6A21\u5F0F\uFF1A\u76F4\u63A5\u6307\u5B9A classroomId\uFF08\u53EF\u914D\u5408 --course \u4F7F\u7528\uFF09
-  --cookies <path|->         \u5DE5\u5177\u6A21\u5F0F\uFF1ACookie JSON \u6587\u4EF6\u8DEF\u5F84\uFF0C\u4F7F\u7528 - \u4ECE stdin \u8BFB\u53D6\uFF0C\u6216\u76F4\u63A5\u4F20\u5165 JSON \u5B57\u7B26\u4E32
   --since <date>             \u53EA\u4E0B\u8F7D\u8BE5\u65E5\u671F\u53CA\u4E4B\u540E\u7684\u8BFE\u65F6 (YYYY-MM-DD)
   --until <date>             \u53EA\u4E0B\u8F7D\u8BE5\u65E5\u671F\u53CA\u4E4B\u524D\u7684\u8BFE\u65F6 (YYYY-MM-DD)
   --latest                   \u53EA\u4E0B\u8F7D\u6700\u65B0\u4E00\u6B21\u8BFE\u65F6
@@ -241,14 +236,15 @@ function loadConfig(argv = process.argv) {
     }
     return config;
   }
+  const hasCookies = Boolean(process.env.RAIN_COOKIES);
   if (config.verifyAuth || config.listCourses) {
     const hasManifest2 = Boolean(config.manifest);
     const hasToolMode2 = Boolean(config.course);
     if (!hasManifest2 && !hasToolMode2) {
-      throw new Error(`${config.verifyAuth ? "verify-auth" : "list-courses"} \u5B50\u547D\u4EE4\u5FC5\u987B\u63D0\u4F9B --manifest \u6216 --course\uFF08\u53CA --cookies\uFF09`);
+      throw new Error(`${config.verifyAuth ? "verify-auth" : "list-courses"} \u5B50\u547D\u4EE4\u5FC5\u987B\u63D0\u4F9B --manifest \u6216 --course\uFF08\u53CA RAIN_COOKIES \u73AF\u5883\u53D8\u91CF\uFF09`);
     }
-    if (hasToolMode2 && !config.cookies) {
-      throw new Error(`${config.verifyAuth ? "verify-auth" : "list-courses"} \u5DE5\u5177\u6A21\u5F0F\u5FC5\u987B\u63D0\u4F9B --cookies`);
+    if (hasToolMode2 && !hasCookies) {
+      throw new Error(`${config.verifyAuth ? "verify-auth" : "list-courses"} \u5DE5\u5177\u6A21\u5F0F\u5FC5\u987B\u8BBE\u7F6E RAIN_COOKIES \u73AF\u5883\u53D8\u91CF`);
     }
     return config;
   }
@@ -257,8 +253,8 @@ function loadConfig(argv = process.argv) {
   if (!hasManifest && !hasToolMode) {
     throw new Error("\u5FC5\u987B\u63D0\u4F9B --manifest \u53C2\u6570\u6216 --course \u53C2\u6570\uFF08\u6216\u5BF9\u5E94\u73AF\u5883\u53D8\u91CF\uFF09\uFF0C\u6216\u4F7F\u7528 summarize/verify-auth/list-courses \u5B50\u547D\u4EE4");
   }
-  if (hasToolMode && !config.cookies) {
-    throw new Error("\u5DE5\u5177\u6A21\u5F0F (--course) \u5FC5\u987B\u63D0\u4F9B --cookies \u53C2\u6570\u6216 RAIN_COOKIES \u73AF\u5883\u53D8\u91CF");
+  if (hasToolMode && !hasCookies) {
+    throw new Error("\u5DE5\u5177\u6A21\u5F0F (--course) \u5FC5\u987B\u8BBE\u7F6E RAIN_COOKIES \u73AF\u5883\u53D8\u91CF");
   }
   return config;
 }
@@ -286,6 +282,17 @@ function normalizeSlideManifest(slideManifest) {
     return buildSlideUrl(slideId, coverId, ts, expire, `${tokenBase}:${tokenSuffix}`);
   });
 }
+function loadCookiesFromEnv() {
+  const raw = process.env.RAIN_COOKIES;
+  if (!raw) {
+    return null;
+  }
+  try {
+    return JSON.parse(raw);
+  } catch (err) {
+    throw new Error(`RAIN_COOKIES \u73AF\u5883\u53D8\u91CF JSON \u89E3\u6790\u5931\u8D25: ${err.message}`);
+  }
+}
 function readManifest(source) {
   let raw;
   if (source === "-") {
@@ -299,13 +306,6 @@ function readManifest(source) {
   } catch (err) {
     throw new Error(`Manifest JSON \u89E3\u6790\u5931\u8D25: ${err.message}`);
   }
-  if (!manifest.cookies && process.env.RAIN_COOKIES) {
-    try {
-      manifest.cookies = JSON.parse(process.env.RAIN_COOKIES);
-    } catch (err) {
-      throw new Error(`RAIN_COOKIES \u73AF\u5883\u53D8\u91CF JSON \u89E3\u6790\u5931\u8D25: ${err.message}`);
-    }
-  }
   validateAndNormalize(manifest);
   return manifest;
 }
@@ -316,9 +316,14 @@ function validateAndNormalize(manifest) {
   if (!manifest.courseName) {
     throw new Error("Manifest \u7F3A\u5C11 courseName");
   }
-  if (!manifest.cookies || typeof manifest.cookies !== "object") {
-    throw new Error("Manifest \u7F3A\u5C11 cookies \u5BF9\u8C61");
+  if (manifest.cookies) {
+    throw new Error("Manifest \u6587\u4EF6\u4E0D\u518D\u652F\u6301 cookies \u5B57\u6BB5\uFF1B\u8BF7\u901A\u8FC7 RAIN_COOKIES \u73AF\u5883\u53D8\u91CF\u4F20\u9012\u767B\u5F55\u6001");
   }
+  const cookies = loadCookiesFromEnv();
+  if (!cookies || typeof cookies !== "object") {
+    throw new Error("\u7F3A\u5C11\u767B\u5F55\u6001\uFF1B\u8BF7\u8BBE\u7F6E RAIN_COOKIES \u73AF\u5883\u53D8\u91CF");
+  }
+  manifest.cookies = cookies;
   const hasLessons = Array.isArray(manifest.lessons) && manifest.lessons.length > 0;
   const hasClassroomId = Boolean(manifest.classroomId);
   if (!hasClassroomId && !hasLessons) {
@@ -11147,25 +11152,11 @@ ${combined}`
 var import_node_path7 = __toESM(require("node:path"), 1);
 
 // src/verify-auth.js
-var import_node_fs5 = require("node:fs");
-function readCookies(source) {
-  if (source === "-") {
-    return JSON.parse((0, import_node_fs5.readFileSync)(0, "utf-8"));
-  }
-  const trimmed = source.trim();
-  if (trimmed.startsWith("{")) {
-    return JSON.parse(trimmed);
-  }
-  const raw = (0, import_node_fs5.readFileSync)(source, "utf-8");
-  return JSON.parse(raw);
-}
 function buildToolManifest(config) {
-  const cookies = readCookies(config.cookies);
   return validateAndNormalize({
     version: "1.0",
     courseName: config.course,
     classroomId: config.classroomId,
-    cookies,
     headers: {
       "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
     }

@@ -1,14 +1,10 @@
 {
   "version": "1.0",
   "courseName": "25秋-26春研究生《日语》",
-  "cookies": {
-    "sessionid": "your_session_id",
-    "csrftoken": "your_csrf_token",
-    "uv_id": "0",
-    "university_id": "0",
-    "xtbz": "ykt"
-  },
   "headers": {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
   }
 }
+
+// Cookie 通过 RAIN_COOKIES 环境变量传入，例如：
+// export RAIN_COOKIES='{"sessionid":"your_session_id","csrftoken":"your_csrf_token","uv_id":"0","university_id":"0","xtbz":"ykt"}'

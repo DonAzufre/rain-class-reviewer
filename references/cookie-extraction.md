@@ -43,6 +43,19 @@
 
 - **允许**：用 MCP 读取网络请求头以获取 Cookie。
 - **禁止**：用 MCP 读取 API 响应体来获取课程/课时/PPT 等业务数据；这些必须交给 `scripts/bootstrap.js` 完成。
+- **禁止**：把 Cookie 写入 Manifest 文件或任何磁盘文件，敏感信息只能通过 `RAIN_COOKIES` 环境变量传递。
+
+## 传给脚本
+
+把解析出的字段组装成 JSON，通过 `RAIN_COOKIES` 环境变量传入：
+
+```bash
+# Windows CMD
+set RAIN_COOKIES={"sessionid":"abc123","csrftoken":"xyz789","uv_id":"0","university_id":"0","xtbz":"ykt"}
+
+# Git Bash / Linux / macOS
+export RAIN_COOKIES='{"sessionid":"abc123","csrftoken":"xyz789","uv_id":"0","university_id":"0","xtbz":"ykt"}'
+```
 
 ## 回退方案
 

@@ -1,29 +1,11 @@
 import { readManifest, validateAndNormalize } from './manifest.js';
 import { fetchCourseList } from './discover.js';
-import { readFileSync } from 'node:fs';
-
-function readCookies(source) {
-  if (source === '-') {
-    return JSON.parse(readFileSync(0, 'utf-8'));
-  }
-
-  const trimmed = source.trim();
-  if (trimmed.startsWith('{')) {
-    return JSON.parse(trimmed);
-  }
-
-  const raw = readFileSync(source, 'utf-8');
-  return JSON.parse(raw);
-}
 
 export function buildToolManifest(config) {
-  const cookies = readCookies(config.cookies);
-
   return validateAndNormalize({
     version: '1.0',
     courseName: config.course,
     classroomId: config.classroomId,
-    cookies,
     headers: {
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
     },

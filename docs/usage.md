@@ -19,37 +19,33 @@ node src/index.js --manifest ./manifest.json
 
 ### 模式一：工具模式（直接给定课程名）
 
-只需要课程名和 Cookie，工具会自动发现课程、课时并下载。Cookie 可以是文件路径或 JSON 字符串：
+只需要课程名，Cookie 通过 `RAIN_COOKIES` 环境变量传入：
 
 ```bash
-# Cookie 文件
-node src/index.js --course "工程伦理概论" --cookies ./cookies.json
+# Windows CMD
+set RAIN_COOKIES={"sessionid":"...","csrftoken":"...","uv_id":"0","university_id":"0","xtbz":"ykt"}
+node src/index.js --course "工程伦理概论"
 
-# Cookie JSON 字符串
-node src/index.js --course "工程伦理概论" --cookies '{"sessionid":"...","csrftoken":"...","uv_id":"0","university_id":"0","xtbz":"ykt"}'
+# Git Bash / Linux / macOS
+export RAIN_COOKIES='{"sessionid":"...","csrftoken":"...","uv_id":"0","university_id":"0","xtbz":"ykt"}'
+node src/index.js --course "工程伦理概论"
 
 # 直接指定 classroomId（跳过课程名匹配）
-node src/index.js --course "工程伦理概论" --classroom-id "13522533" --cookies ./cookies.json
-```
-
-`cookies.json` 示例：
-
-```json
-{
-  "sessionid": "...",
-  "csrftoken": "...",
-  "uv_id": "0",
-  "university_id": "0",
-  "xtbz": "ykt"
-}
+set RAIN_COOKIES={...}
+node src/index.js --course "工程伦理概论" --classroom-id "13522533"
 ```
 
 ### 模式二：Agent/Skill 模式（通过 Manifest）
 
-Agent 通过 Chrome DevTools MCP 完成登录态检查、Cookie 读取后生成 Manifest，再调用工具。在 Skill 工作流中，Manifest 应写入 Skill 目录下的 `tmp/manifest.json`（覆盖），并通过路径引用：
+Agent 通过 Chrome DevTools MCP 完成登录态检查、Cookie 读取后生成 Manifest，再调用工具。在 Skill 工作流中：
+
+- Manifest 只保留 `version`、`courseName`、`classroomId`，**不得包含 cookies 字段**。
+- Cookie 通过 `RAIN_COOKIES` 环境变量传入。
+- Manifest 写入 Skill 目录下的 `tmp/manifest.json`（覆盖），并通过路径引用：
 
 ```bash
-node <skill-path>/scripts/bootstrap.js --manifest <skill-path>/tmp/manifest.json --output rain-class-reviewer-downloads --json
+set RAIN_COOKIES={...}
+node <skill-path>/scripts/bootstrap.js --manifest <skill-path>/tmp/manifest.json --json
 ```
 
 **约束**：MCP 仅用于获取 Cookie 和处理复杂/模糊场景；构造 Manifest 后必须停止 MCP，后续由脚本完成。完整接口清单见 `references/yuketang-api.md`。
@@ -61,7 +57,6 @@ node <skill-path>/scripts/bootstrap.js --manifest <skill-path>/tmp/manifest.json
 | `--manifest <path>` | Manifest 文件路径，`-` 表示从 stdin 读取 | 与 `--course` 二选一 |
 | `--course <name>` | 工具模式：按课程名严格匹配 | 与 `--manifest` 二选一 |
 | `--classroom-id <id>` | 工具模式：直接指定 classroomId（可配合 `--course` 使用） | - |
-| `--cookies <path\|json>` | 工具模式：Cookie JSON 文件路径或直接传入 JSON 字符串 | 工具模式必填 |
 | `--output <dir>` | 输出根目录 | `rain-class-reviewer-downloads` |
 | `--concurrency <n>` | 并发下载数 | 3 |
 | `--extract-concurrency <n>` | 图像提取并发数 | 2 |
@@ -79,26 +74,28 @@ node <skill-path>/scripts/bootstrap.js --manifest <skill-path>/tmp/manifest.json
 无论是工具模式还是 Manifest 模式，都可以在下载阶段过滤课时：
 
 ```bash
+# 以下示例默认已设置 RAIN_COOKIES 环境变量
+
 # 只下载最新一次课
-node src/index.js --course "工程伦理概论" --cookies ./cookies.json --latest
+node src/index.js --course "工程伦理概论" --latest
 
 # 下载 2026-06-01 之后的所有课
-node src/index.js --course "工程伦理概论" --cookies ./cookies.json --since 2026-06-01
+node src/index.js --course "工程伦理概论" --since 2026-06-01
 
 # 下载 2026-05-01 到 2026-06-10 之间的课
-node src/index.js --course "工程伦理概论" --cookies ./cookies.json \
+node src/index.js --course "工程伦理概论" \
   --since 2026-05-01 --until 2026-06-10
 
 # 下载指定 lessonId 的课（可多次使用 --lesson-id）
-node src/index.js --course "工程伦理概论" --cookies ./cookies.json \
+node src/index.js --course "工程伦理概论" \
   --lesson-id 1704863264448235136 \
   --lesson-id 1699795924878665984
 
 # 下载指定日期的课（可多次使用 --lesson-date）
-node src/index.js --course "工程伦理概论" --cookies ./cookies.json \
+node src/index.js --course "工程伦理概论" \
   --lesson-date 2026-06-10
 
-# Manifest 模式同样支持过滤
+# Manifest 模式同样支持过滤（Cookie 仍来自 RAIN_COOKIES）
 node src/index.js --manifest ./manifest.json --latest
 ```
 
@@ -136,17 +133,16 @@ node src/index.js --manifest ./manifest.json --latest
 {
   "version": "1.0",
   "courseName": "工程伦理概论",
-  "cookies": {
-    "sessionid": "...",
-    "csrftoken": "...",
-    "uv_id": "...",
-    "university_id": "...",
-    "xtbz": "ykt"
-  },
   "headers": {
     "User-Agent": "..."
   }
 }
+```
+
+Cookie 通过 `RAIN_COOKIES` 环境变量传入：
+
+```bash
+export RAIN_COOKIES='{"sessionid":"...","csrftoken":"...","uv_id":"0","university_id":"0","xtbz":"ykt"}'
 ```
 
 ### 显式提供课时
@@ -156,7 +152,6 @@ node src/index.js --manifest ./manifest.json --latest
   "version": "1.0",
   "courseName": "25秋-26春研究生《日语》",
   "classroomId": "22928774",
-  "cookies": { "sessionid": "..." },
   "headers": { "User-Agent": "..." },
   "lessons": [
     {

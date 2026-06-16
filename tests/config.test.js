@@ -1,8 +1,16 @@
-import { describe, it } from 'node:test';
+import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { loadConfig } from '../src/config.js';
 
 describe('config', () => {
+  beforeEach(() => {
+    process.env.RAIN_COOKIES = JSON.stringify({ sessionid: 'abc' });
+  });
+
+  afterEach(() => {
+    delete process.env.RAIN_COOKIES;
+  });
+
   it('should load config from args', () => {
     const config = loadConfig(['node', 'index.js', '--manifest', './test.json', '--concurrency', '5']);
     assert.equal(config.manifest, './test.json');
@@ -13,13 +21,12 @@ describe('config', () => {
   });
 
   it('should load tool mode config from args', () => {
-    const config = loadConfig(['node', 'index.js', '--course', '工程伦理概论', '--cookies', './cookies.json']);
+    const config = loadConfig(['node', 'index.js', '--course', '工程伦理概论']);
     assert.equal(config.course, '工程伦理概论');
-    assert.equal(config.cookies, './cookies.json');
   });
 
   it('should parse classroom-id and default output dir', () => {
-    const config = loadConfig(['node', 'index.js', '--course', '工程伦理概论', '--classroom-id', '13522533', '--cookies', './cookies.json']);
+    const config = loadConfig(['node', 'index.js', '--course', '工程伦理概论', '--classroom-id', '13522533']);
     assert.equal(config.classroomId, '13522533');
     assert.ok(config.output.endsWith('rain-class-reviewer-downloads'));
   });
@@ -28,24 +35,25 @@ describe('config', () => {
     assert.throws(() => loadConfig(['node', 'index.js']), /manifest|course/);
   });
 
-  it('should throw when tool mode lacks cookies', () => {
-    assert.throws(() => loadConfig(['node', 'index.js', '--course', '工程伦理概论']), /cookies/);
+  it('should throw when tool mode lacks RAIN_COOKIES env', () => {
+    delete process.env.RAIN_COOKIES;
+    assert.throws(() => loadConfig(['node', 'index.js', '--course', '工程伦理概论']), /RAIN_COOKIES/);
   });
 
   it('should parse latest filter', () => {
-    const config = loadConfig(['node', 'index.js', '--course', '工程伦理概论', '--cookies', './cookies.json', '--latest']);
+    const config = loadConfig(['node', 'index.js', '--course', '工程伦理概论', '--latest']);
     assert.equal(config.latest, true);
   });
 
   it('should parse since and until filters', () => {
-    const config = loadConfig(['node', 'index.js', '--course', '工程伦理概论', '--cookies', './cookies.json', '--since', '2026-06-01', '--until', '2026-06-10']);
+    const config = loadConfig(['node', 'index.js', '--course', '工程伦理概论', '--since', '2026-06-01', '--until', '2026-06-10']);
     assert.equal(config.since, '2026-06-01');
     assert.equal(config.until, '2026-06-10');
   });
 
   it('should parse multiple lesson-id and lesson-date filters', () => {
     const config = loadConfig([
-      'node', 'index.js', '--course', '工程伦理概论', '--cookies', './cookies.json',
+      'node', 'index.js', '--course', '工程伦理概论',
       '--lesson-id', '123',
       '--lesson-id', '456',
       '--lesson-date', '2026-06-01',
