@@ -49,6 +49,16 @@ export function readManifest(source) {
     throw new Error(`Manifest JSON 解析失败: ${err.message}`);
   }
 
+  // 如果 Manifest 文件本身不含 cookies，允许通过 RAIN_COOKIES 环境变量传入
+  // 这样可以避免在自动模式下把 Cookie 写入磁盘
+  if (!manifest.cookies && process.env.RAIN_COOKIES) {
+    try {
+      manifest.cookies = JSON.parse(process.env.RAIN_COOKIES);
+    } catch (err) {
+      throw new Error(`RAIN_COOKIES 环境变量 JSON 解析失败: ${err.message}`);
+    }
+  }
+
   validateAndNormalize(manifest);
   return manifest;
 }

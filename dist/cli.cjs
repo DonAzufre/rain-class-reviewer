@@ -299,6 +299,13 @@ function readManifest(source) {
   } catch (err) {
     throw new Error(`Manifest JSON \u89E3\u6790\u5931\u8D25: ${err.message}`);
   }
+  if (!manifest.cookies && process.env.RAIN_COOKIES) {
+    try {
+      manifest.cookies = JSON.parse(process.env.RAIN_COOKIES);
+    } catch (err) {
+      throw new Error(`RAIN_COOKIES \u73AF\u5883\u53D8\u91CF JSON \u89E3\u6790\u5931\u8D25: ${err.message}`);
+    }
+  }
   validateAndNormalize(manifest);
   return manifest;
 }

@@ -1,6 +1,9 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { validateAndNormalize, cookieString } from '../src/manifest.js';
+import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import { validateAndNormalize, cookieString, readManifest } from '../src/manifest.js';
 
 describe('manifest', () => {
   it('should validate full-url manifest and convert images to single presentation', () => {
@@ -113,5 +116,20 @@ describe('manifest', () => {
     assert.equal(manifest.needsDiscovery, true);
     assert.equal(manifest.needsLessonDiscovery, false);
     assert.deepEqual(manifest.lessons, []);
+  });
+
+  it('should read cookies from RAIN_COOKIES env var when manifest omits cookies', () => {
+    const tempDir = mkdtempSync(path.join(tmpdir(), 'rain-manifest-'));
+    const manifestPath = path.join(tempDir, 'manifest.json');
+    writeFileSync(manifestPath, JSON.stringify({ version: '1.0', courseName: 'Env Course' }), 'utf-8');
+
+    process.env.RAIN_COOKIES = JSON.stringify({ sessionid: 'env-session' });
+    try {
+      const manifest = readManifest(manifestPath);
+      assert.equal(manifest.cookies.sessionid, 'env-session');
+    } finally {
+      delete process.env.RAIN_COOKIES;
+      rmSync(tempDir, { recursive: true, force: true });
+    }
   });
 });
