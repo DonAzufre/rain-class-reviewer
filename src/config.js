@@ -180,15 +180,23 @@ function showHelp() {
   RAIN_COURSE, RAIN_CLASSROOM_ID, RAIN_COOKIES
   RAIN_SINCE, RAIN_UNTIL, RAIN_LATEST, RAIN_LESSON_ID, RAIN_LESSON_DATE
   RAIN_COURSE_DIR, RAIN_LESSON_DIR, RAIN_MODEL, RAIN_EXTRACT_MODEL
-  RAIN_EXTRACT_CONCURRENCY, RAIN_API_KEY
+  RAIN_EXTRACT_CONCURRENCY, RAIN_API_KEY, MIMO_TP_API_KEY
 `);
 }
 
 export function loadApiKey(config) {
+  // 优先从 MIMO_TP_API_KEY 环境变量读取
+  if (process.env.MIMO_TP_API_KEY) {
+    const envKey = process.env.MIMO_TP_API_KEY.trim();
+    if (envKey.startsWith('tp-')) {
+      return envKey;
+    }
+  }
+
   const raw = config.apiKey || DEFAULTS.apiKey;
 
   if (!raw) {
-    throw new Error('必须提供 --api-key 参数或设置 RAIN_API_KEY 环境变量');
+    throw new Error('必须提供 --api-key 参数、设置 RAIN_API_KEY 或 MIMO_TP_API_KEY 环境变量');
   }
 
   // 直接传入 key

@@ -178,11 +178,12 @@ node src/index.js summarize \
 
 ## 二期：LLM 总结
 
-计划接入小米 MiMo Token Plan CN（OpenAI 兼容协议）：
+已接入小米 MiMo Token Plan CN（OpenAI 兼容协议）：
 
 - Base URL: `https://token-plan-cn.xiaomimimo.com/v1`
 - API Key: `tp-xxxxx`
 - 模型: `mimo-v2.5` / `mimo-v2.5-pro`
+- API Key 优先从 `MIMO_TP_API_KEY` 环境变量读取，其次使用 `--api-key` 或 `RAIN_API_KEY`。
 
 命令预览：
 

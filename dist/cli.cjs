@@ -196,13 +196,19 @@ function showHelp() {
   RAIN_COURSE, RAIN_CLASSROOM_ID, RAIN_COOKIES
   RAIN_SINCE, RAIN_UNTIL, RAIN_LATEST, RAIN_LESSON_ID, RAIN_LESSON_DATE
   RAIN_COURSE_DIR, RAIN_LESSON_DIR, RAIN_MODEL, RAIN_EXTRACT_MODEL
-  RAIN_EXTRACT_CONCURRENCY, RAIN_API_KEY
+  RAIN_EXTRACT_CONCURRENCY, RAIN_API_KEY, MIMO_TP_API_KEY
 `);
 }
 function loadApiKey(config) {
+  if (process.env.MIMO_TP_API_KEY) {
+    const envKey = process.env.MIMO_TP_API_KEY.trim();
+    if (envKey.startsWith("tp-")) {
+      return envKey;
+    }
+  }
   const raw = config.apiKey || DEFAULTS.apiKey;
   if (!raw) {
-    throw new Error("\u5FC5\u987B\u63D0\u4F9B --api-key \u53C2\u6570\u6216\u8BBE\u7F6E RAIN_API_KEY \u73AF\u5883\u53D8\u91CF");
+    throw new Error("\u5FC5\u987B\u63D0\u4F9B --api-key \u53C2\u6570\u3001\u8BBE\u7F6E RAIN_API_KEY \u6216 MIMO_TP_API_KEY \u73AF\u5883\u53D8\u91CF");
   }
   if (raw.startsWith("tp-")) {
     return raw.trim();

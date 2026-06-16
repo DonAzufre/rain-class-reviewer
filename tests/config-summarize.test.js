@@ -49,6 +49,16 @@ describe('config summarize', () => {
     assert.equal(key, 'tp-test123');
   });
 
+  it('should prefer MIMO_TP_API_KEY env var', () => {
+    process.env.MIMO_TP_API_KEY = 'tp-env123';
+    try {
+      const key = loadApiKey({ apiKey: 'tp-test123' });
+      assert.equal(key, 'tp-env123');
+    } finally {
+      delete process.env.MIMO_TP_API_KEY;
+    }
+  });
+
   it('should load api key from file', () => {
     const keyPath = path.join(tempDir, 'key.txt');
     writeFileSync(keyPath, 'tp-fromfile\n');
