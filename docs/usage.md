@@ -19,17 +19,17 @@ node src/index.js --manifest ./manifest.json
 
 ### 模式一：工具模式（直接给定课程名）
 
-只需要课程名和 Cookie，工具会自动发现课程、课时并下载。Cookie 可以是文件路径、JSON 字符串或从 stdin 读取：
+只需要课程名和 Cookie，工具会自动发现课程、课时并下载。Cookie 可以是文件路径或 JSON 字符串：
 
 ```bash
 # Cookie 文件
 node src/index.js --course "工程伦理概论" --cookies ./cookies.json
 
 # Cookie JSON 字符串
-node src/index.js --course "工程伦理概论" --cookies '{"sessionid":"...","csrftoken":"...","uv_id":"2874","university_id":"2874","xtbz":"ykt"}'
+node src/index.js --course "工程伦理概论" --cookies '{"sessionid":"...","csrftoken":"...","uv_id":"0","university_id":"0","xtbz":"ykt"}'
 
-# 从 stdin 读取 Cookie
-echo '{"sessionid":"..."}' | node src/index.js --course "工程伦理概论" --cookies -
+# 直接指定 classroomId（跳过课程名匹配）
+node src/index.js --course "工程伦理概论" --classroom-id "13522533" --cookies ./cookies.json
 ```
 
 `cookies.json` 示例：
@@ -38,24 +38,18 @@ echo '{"sessionid":"..."}' | node src/index.js --course "工程伦理概论" --c
 {
   "sessionid": "...",
   "csrftoken": "...",
-  "uv_id": "2874",
-  "university_id": "2874",
+  "uv_id": "0",
+  "university_id": "0",
   "xtbz": "ykt"
 }
 ```
 
 ### 模式二：Agent/Skill 模式（通过 Manifest）
 
-Agent 通过 Chrome DevTools MCP 完成登录态检查、Cookie 读取后生成 Manifest，再调用工具。Manifest 可以直接通过 stdin 传入，避免写临时文件：
+Agent 通过 Chrome DevTools MCP 完成登录态检查、Cookie 读取后生成 Manifest，再调用工具。在 Skill 工作流中，Manifest 应写入 Skill 目录下的 `tmp/manifest.json`（覆盖），并通过路径引用：
 
 ```bash
-cat <<'EOF' | node src/index.js --manifest -
-{
-  "version": "1.0",
-  "courseName": "工程伦理概论",
-  "cookies": { "sessionid": "...", "csrftoken": "...", "uv_id": "2874", "university_id": "2874", "xtbz": "ykt" }
-}
-EOF
+node <skill-path>/scripts/bootstrap.js --manifest <skill-path>/tmp/manifest.json --output rain-class-reviewer-downloads --json
 ```
 
 **约束**：MCP 仅用于获取 Cookie 和处理复杂/模糊场景；构造 Manifest 后必须停止 MCP，后续由脚本完成。完整接口清单见 `references/yuketang-api.md`。
@@ -66,8 +60,9 @@ EOF
 |------|------|--------|
 | `--manifest <path>` | Manifest 文件路径，`-` 表示从 stdin 读取 | 与 `--course` 二选一 |
 | `--course <name>` | 工具模式：按课程名严格匹配 | 与 `--manifest` 二选一 |
-| `--cookies <path\|->` | 工具模式：Cookie JSON 文件路径、JSON 字符串或 `-` 从 stdin 读取 | 工具模式必填 |
-| `--output <dir>` | 输出根目录 | `downloads` |
+| `--classroom-id <id>` | 工具模式：直接指定 classroomId（可配合 `--course` 使用） | - |
+| `--cookies <path\|json>` | 工具模式：Cookie JSON 文件路径或直接传入 JSON 字符串 | 工具模式必填 |
+| `--output <dir>` | 输出根目录 | `rain-class-reviewer-downloads` |
 | `--concurrency <n>` | 并发下载数 | 3 |
 | `--extract-concurrency <n>` | 图像提取并发数 | 2 |
 | `--retry <n>` | 单张图片失败重试次数 | 3 |
@@ -121,6 +116,7 @@ node src/index.js --manifest ./manifest.json --latest
 
 - `RAIN_MANIFEST`
 - `RAIN_COURSE`
+- `RAIN_CLASSROOM_ID`
 - `RAIN_COOKIES`
 - `RAIN_OUTPUT`
 - `RAIN_CONCURRENCY`
@@ -224,9 +220,6 @@ node src/index.js --manifest ./manifest.json --latest
 
 ```bash
 node src/index.js verify-auth --manifest ./manifest.json
-
-# 或从 stdin 读取
-node src/index.js verify-auth --manifest - < ./manifest.json
 ```
 
 成功输出：
@@ -243,9 +236,6 @@ node src/index.js verify-auth --manifest - < ./manifest.json
 
 ```bash
 node src/index.js list-courses --manifest ./manifest.json --json
-
-# 或从 stdin 读取
-node src/index.js list-courses --manifest - --json < ./manifest.json
 ```
 
 JSON 输出示例：
@@ -267,7 +257,7 @@ Agent/Skill 流程中，先 `list-courses` 再匹配用户输入；若存在同�
 下载完成后，可以对课程图片进行 LLM 识别、信息提取和去重总结：
 
 ```bash
-node src/index.js summarize --course-dir "downloads/算法设计与分析"
+node src/index.js summarize --course-dir "rain-class-reviewer-downloads/算法设计与分析"
 ```
 
 常用参数：
@@ -289,23 +279,23 @@ node src/index.js summarize --course-dir "downloads/算法设计与分析"
 
 ```bash
 # 总结整门课程
-node src/index.js summarize --course-dir "downloads/算法设计与分析"
+node src/index.js summarize --course-dir "rain-class-reviewer-downloads/算法设计与分析"
 
 # 只总结某一节课
 node src/index.js summarize \
-  --course-dir "downloads/算法设计与分析" \
-  --lesson-dir "downloads/算法设计与分析/2024-12-24_1318590613705012608_5.2 贪心法正确性证明（2）"
+  --course-dir "rain-class-reviewer-downloads/算法设计与分析" \
+  --lesson-dir "rain-class-reviewer-downloads/算法设计与分析/2024-12-24_1318590613705012608_5.2 贪心法正确性证明（2）"
 
 # 指定模型、降低并发避免限流
 node src/index.js summarize \
-  --course-dir "downloads/算法设计与分析" \
+  --course-dir "rain-class-reviewer-downloads/算法设计与分析" \
   --model mimo-v2.5-pro \
   --extract-model mimo-v2.5 \
   --extract-concurrency 1 \
   --api-key ./my-mimo-key.txt
 
 # 强制重新提取并总结
-node src/index.js summarize --course-dir "downloads/算法设计与分析" --force-summary
+node src/index.js summarize --course-dir "rain-class-reviewer-downloads/算法设计与分析" --force-summary
 ```
 
 总结流程：
@@ -317,11 +307,11 @@ node src/index.js summarize --course-dir "downloads/算法设计与分析" --for
 
 ## 输出目录结构
 
-默认输出到 `downloads/` 目录：
+默认输出到 `rain-class-reviewer-downloads/` 目录：
 
 ```
 ./
-└── downloads/
+└── rain-class-reviewer-downloads/
     └── 算法设计与分析/
         ├── meta.json
         ├── review.md                      # 课程复习大纲

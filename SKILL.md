@@ -38,10 +38,12 @@ disableModelInvocation: false
 
 一旦你通过 MCP 拿到 Cookie 并构造出最小 Manifest（包含 `version`、`courseName`、`cookies`），**立即停止所有 chrome-devtools-mcp 操作**。后续步骤必须交给脚本：
 
-1. `node scripts/bootstrap.js verify-auth --manifest -` 校验登录态。
-2. `node scripts/bootstrap.js list-courses --manifest - --json` 获取课程列表。
-3. `node scripts/bootstrap.js --manifest - --json` 下载课件。
-4. `node scripts/bootstrap.js summarize --course-dir "downloads/<课程名>" --force-summary` 提取笔记并生成复习大纲。
+1. `node <skill-path>/scripts/bootstrap.js verify-auth --manifest <skill-path>/tmp/manifest.json` 校验登录态。
+2. `node <skill-path>/scripts/bootstrap.js list-courses --manifest <skill-path>/tmp/manifest.json --json` 获取课程列表。
+3. `node <skill-path>/scripts/bootstrap.js --manifest <skill-path>/tmp/manifest.json --output rain-class-reviewer-downloads --json` 下载课件。
+4. `node <skill-path>/scripts/bootstrap.js summarize --course-dir "rain-class-reviewer-downloads/<课程名>" --force-summary` 提取笔记并生成复习大纲。
+
+> 为兼容 Claude Code auto mode 的安全策略，**不要把 Manifest 通过 stdin 传入**。把最终 Manifest 写入 Skill 目录下的 `tmp/manifest.json`（覆盖写入），并在命令中通过路径引用。`tmp/` 已在 `.gitignore` 中，不会进入版本控制。
 
 只有在脚本明确报告需要人工处理（如验证码、需要用户在浏览器里点选）时，才允许再次启用 MCP，且处理完后必须立刻回到脚本流程。
 
@@ -61,19 +63,27 @@ disableModelInvocation: false
 
 ## 快速开始
 
-所有命令以本 Skill 目录为工作目录。首次调用时 `scripts/bootstrap.js` 会自动安装依赖。
+**所有命令应在当前 Claude Code / OpenCode 项目根目录执行**，通过 Skill 目录的相对路径调用脚本。首次调用时 `scripts/bootstrap.js` 会优先使用预构建的 `dist/cli.cjs`（已包含 `openai` 等依赖），无需联网安装；若不存在才会自动 `npm install`。
 
 ### 完整流程
 
 ```text
 1. 询问用户课程名（或关键词）。
 2. 用 MCP 打开 https://changjiang.yuketang.cn/ 并获取 Cookie（优先从 Network 请求头读取）。
-3. 构造最小 Manifest JSON。
-4. 运行 node scripts/bootstrap.js verify-auth --manifest - 校验登录态。
-5. 运行 node scripts/bootstrap.js list-courses --manifest - --json 获取课程列表。
+3. 构造最小 Manifest JSON，写入 <skill-path>/tmp/manifest.json。
+4. 运行 node <skill-path>/scripts/bootstrap.js verify-auth --manifest <skill-path>/tmp/manifest.json 校验登录态。
+5. 运行 node <skill-path>/scripts/bootstrap.js list-courses --manifest <skill-path>/tmp/manifest.json --json 获取课程列表。
 6. 根据用户输入匹配课程；有歧义时向用户展示候选并确认 classroomId。
-7. 构造带 classroomId 的 Manifest，运行 node scripts/bootstrap.js --manifest - --json 下载。
-8. 运行 node scripts/bootstrap.js summarize --course-dir "downloads/<课程名>" --force-summary 生成复习大纲。
+7. 使用课程列表返回的原始 courseName，构造带 classroomId 的 Manifest（覆盖 tmp/manifest.json），运行 node <skill-path>/scripts/bootstrap.js --manifest <skill-path>/tmp/manifest.json --output rain-class-reviewer-downloads --json 下载。
+8. 运行 node <skill-path>/scripts/bootstrap.js summarize --course-dir "rain-class-reviewer-downloads/<原始课程名>" --force-summary 生成复习大纲。
+```
+
+示例（Claude Code 项目级 Skill 路径为 `.claude/skills/rain-class-reviewer`）：
+
+```bash
+node .claude/skills/rain-class-reviewer/scripts/bootstrap.js \
+  --manifest .claude/skills/rain-class-reviewer/tmp/manifest.json \
+  --output rain-class-reviewer-downloads --json
 ```
 
 ## 标准执行流程
@@ -104,18 +114,21 @@ disableModelInvocation: false
 1. 调用 `list_network_requests` 查看最近的请求。
 2. 找到发往 `changjiang.yuketang.cn` 的请求（如页面文档、JS/CSS、或 `/v2/api/web/courses/list`）。
 3. 使用 `get_network_request` 读取该请求的 **Request Headers**。
-4. 在请求头中找到 `cookie` 或 `Cookie` 字段，从中解析：
-   - `sessionid`
-   - `csrftoken`
-   - `uv_id`（通常为 `2874`）
-   - `university_id`（通常为 `2874`）
+4. 在请求头中找到 `cookie` 或 `Cookie` 字段，从中解析。常见字段包括：
+   - `sessionid`（必须）
+   - `csrftoken`（建议携带，用于 CSRF 校验）
+   - `uv_id`（按实际值提取，可能是 `0` 或其他值）
+   - `university_id`（按实际值提取，可能与 `uv_id` 相同或不同）
    - `xtbz`（通常为 `ykt`）
+   - `django_language`（可选）
 
 示例 Cookie 头：
 
 ```text
-sessionid=abc123; csrftoken=xyz789; uv_id=2874; university_id=2874; xtbz=ykt
+sessionid=abc123; csrftoken=xyz789; uv_id=0; university_id=0; xtbz=ykt
 ```
+
+> 不要硬编码 `uv_id=2874` 或 `university_id=2874`，必须从请求头中读取实际值。缺失或 `0` 都是允许的。
 
 #### 2.3 处理未登录情况
 
@@ -140,8 +153,8 @@ sessionid=abc123; csrftoken=xyz789; uv_id=2874; university_id=2874; xtbz=ykt
   "cookies": {
     "sessionid": "...",
     "csrftoken": "...",
-    "uv_id": "2874",
-    "university_id": "2874",
+    "uv_id": "0",
+    "university_id": "0",
     "xtbz": "ykt"
   }
 }
@@ -152,7 +165,7 @@ sessionid=abc123; csrftoken=xyz789; uv_id=2874; university_id=2874; xtbz=ykt
 ### 4. 校验登录态
 
 ```bash
-echo '<manifest-json>' | node scripts/bootstrap.js verify-auth --manifest -
+node <skill-path>/scripts/bootstrap.js verify-auth --manifest <skill-path>/tmp/manifest.json
 ```
 
 - 成功：继续下一步。
@@ -161,7 +174,7 @@ echo '<manifest-json>' | node scripts/bootstrap.js verify-auth --manifest -
 ### 5. 获取课程列表
 
 ```bash
-echo '<manifest-json>' | node scripts/bootstrap.js list-courses --manifest - --json
+node <skill-path>/scripts/bootstrap.js list-courses --manifest <skill-path>/tmp/manifest.json --json
 ```
 
 返回当前账号下所有课程的 `classroomId`、`courseName`、`className`、`teacher`。
@@ -174,7 +187,7 @@ echo '<manifest-json>' | node scripts/bootstrap.js list-courses --manifest - --j
 - **无匹配**：向用户展示所有可用课程，要求用户指定课程名或 `classroomId`。
 - **多个匹配**：向用户展示候选课程（含班级、教师、classroomId），要求用户确认。
 
-**禁止擅自选择。** 确认后，构造新的 Manifest：
+**禁止擅自选择。** 确认后，使用课程列表返回的**原始 `courseName`** 构造新的 Manifest，并覆盖写入 `tmp/manifest.json`：
 
 ```json
 {
@@ -188,32 +201,32 @@ echo '<manifest-json>' | node scripts/bootstrap.js list-courses --manifest - --j
 ### 7. 下载课件
 
 ```bash
-echo '<manifest-with-classroomid>' | node scripts/bootstrap.js --manifest - --json
+node <skill-path>/scripts/bootstrap.js --manifest <skill-path>/tmp/manifest.json --output rain-class-reviewer-downloads --json
 ```
 
 ### 8. 提取 Markdown 笔记并生成复习大纲
 
 ```bash
-node scripts/bootstrap.js summarize --course-dir "downloads/<课程名>" --force-summary
+node <skill-path>/scripts/bootstrap.js summarize --course-dir "rain-class-reviewer-downloads/<课程名>" --force-summary
 ```
 
 输出：
 
-- 每页 Markdown 笔记：`downloads/<课程名>/extracted/<课时>/<页码>.md`
-- 整体复习大纲：`downloads/<课程名>/review.md`
+- 每页 Markdown 笔记：`rain-class-reviewer-downloads/<课程名>/extracted/<课时>/<页码>.md`
+- 整体复习大纲：`rain-class-reviewer-downloads/<课程名>/review.md`
 
 ## 按课时过滤下载
 
 只下载最新一次课时：
 
 ```bash
-echo '<manifest-json>' | node scripts/bootstrap.js --manifest - --latest --json
+node <skill-path>/scripts/bootstrap.js --manifest <skill-path>/tmp/manifest.json --latest --output rain-class-reviewer-downloads --json
 ```
 
 按日期范围下载：
 
 ```bash
-echo '<manifest-json>' | node scripts/bootstrap.js --manifest - --since 2023-11-01 --until 2023-11-05 --json
+node <skill-path>/scripts/bootstrap.js --manifest <skill-path>/tmp/manifest.json --since 2023-11-01 --until 2023-11-05 --output rain-class-reviewer-downloads --json
 ```
 
 ## 课程名歧义处理
@@ -234,9 +247,9 @@ echo '<manifest-json>' | node scripts/bootstrap.js --manifest - --since 2023-11-
 ## 安全与隐私
 
 - **禁止在对话中明文输出完整 Cookie**。
-- 优先通过 stdin 传递 Cookie 和 Manifest，不在磁盘上保存 `cookies.json`。
-- 如果出于调试必须写临时文件，使用完毕后立即删除，或确保路径在 `.gitignore` 中。
-- 下载目录 `downloads/` 和临时目录 `tmp/` 已在 `.gitignore` 中。
+- Manifest 写入 Skill 目录下的 `tmp/manifest.json`，覆盖之前的内容；`tmp/` 已在 `.gitignore` 中，不会进入版本控制。
+- Cookie 应仅在 Manifest 中传递，不要单独保存 `cookies.json`。
+- 下载目录 `rain-class-reviewer-downloads/` 和临时目录 `tmp/` 已在 `.gitignore` 中。
 
 ## 已知限制
 

@@ -27,16 +27,17 @@
 3. 调用 `get_network_request` 读取该请求的 **Request Headers**。
 4. 提取 `Cookie` 头，例如：
    ```text
-   sessionid=abc123; csrftoken=xyz789; uv_id=2874; university_id=2874; xtbz=ykt
+   sessionid=abc123; csrftoken=xyz789; uv_id=0; university_id=0; xtbz=ykt
    ```
 
 ### 3. 解析所需字段
 
 - `sessionid`：必须。
 - `csrftoken`：建议携带，用于 CSRF 校验。
-- `uv_id`：通常为 `2874`。
-- `university_id`：通常与 `uv_id` 相同。
+- `uv_id`：按 Cookie 头中的实际值提取，可能是 `0` 或其他值，不要硬编码。
+- `university_id`：按 Cookie 头中的实际值提取，可能与 `uv_id` 相同或不同。
 - `xtbz`：通常为 `ykt`。
+- `django_language`：可选。
 
 ## 边界说明
 

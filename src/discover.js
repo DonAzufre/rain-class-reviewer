@@ -94,14 +94,37 @@ function deduplicateByActivityId(lessons) {
 }
 
 export async function discoverCourse(manifest, retry = 3) {
+  if (manifest.classroomId) {
+    // 已提供 classroomId，跳过课程名匹配，直接拉取课时列表
+    const lessons = await fetchLessonList(manifest, manifest.classroomId, retry);
+
+    if (lessons.length === 0) {
+      throw new Error(`classroomId ${manifest.classroomId} 未找到任何课堂记录`);
+    }
+
+    manifest.lessons = lessons.map((l) => ({
+      lessonId: l.lessonId,
+      activityId: l.activityId,
+      date: l.date,
+      title: l.title,
+      needsExtraction: true,
+      images: [],
+    }));
+
+    return manifest;
+  }
+
   if (!manifest.courseName) {
-    throw new Error('自动发现需要 manifest 提供 courseName');
+    throw new Error('自动发现需要 manifest 提供 courseName 或 classroomId');
   }
 
   const courses = await fetchCourseList(manifest, retry);
   const course = findClassroomByName(courses, manifest.courseName);
 
   manifest.classroomId = course.classroomId;
+  // 使用课程列表返回的原始课程名，而不是用户输入的关键词
+  manifest.courseName = course.courseName;
+
   const lessons = await fetchLessonList(manifest, course.classroomId, retry);
 
   if (lessons.length === 0) {

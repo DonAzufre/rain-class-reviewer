@@ -22,6 +22,7 @@ export function buildToolManifest(config) {
   return validateAndNormalize({
     version: '1.0',
     courseName: config.course,
+    classroomId: config.classroomId,
     cookies,
     headers: {
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',

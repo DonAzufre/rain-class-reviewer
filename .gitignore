@@ -7,6 +7,7 @@ pnpm-lock.yaml
 # Output directories
 output/
 downloads/
+rain-class-reviewer-downloads/
 dist/
 build/
 

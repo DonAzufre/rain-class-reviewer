@@ -89,4 +89,29 @@ describe('manifest', () => {
     const str = cookieString(cookies);
     assert.equal(str, 'sessionid=abc; userid=123');
   });
+
+  it('should allow classroomId-only manifest and mark lesson discovery', () => {
+    const manifest = {
+      courseName: 'Test Course',
+      classroomId: '123',
+      cookies: { sessionid: 'abc' },
+    };
+
+    validateAndNormalize(manifest);
+    assert.equal(manifest.needsDiscovery, false);
+    assert.equal(manifest.needsLessonDiscovery, true);
+    assert.deepEqual(manifest.lessons, []);
+  });
+
+  it('should mark full discovery when neither classroomId nor lessons provided', () => {
+    const manifest = {
+      courseName: 'Test Course',
+      cookies: { sessionid: 'abc' },
+    };
+
+    validateAndNormalize(manifest);
+    assert.equal(manifest.needsDiscovery, true);
+    assert.equal(manifest.needsLessonDiscovery, false);
+    assert.deepEqual(manifest.lessons, []);
+  });
 });

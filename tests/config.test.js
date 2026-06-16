@@ -18,6 +18,12 @@ describe('config', () => {
     assert.equal(config.cookies, './cookies.json');
   });
 
+  it('should parse classroom-id and default output dir', () => {
+    const config = loadConfig(['node', 'index.js', '--course', '工程伦理概论', '--classroom-id', '13522533', '--cookies', './cookies.json']);
+    assert.equal(config.classroomId, '13522533');
+    assert.ok(config.output.endsWith('rain-class-reviewer-downloads'));
+  });
+
   it('should throw when manifest and course are both missing', () => {
     assert.throws(() => loadConfig(['node', 'index.js']), /manifest|course/);
   });

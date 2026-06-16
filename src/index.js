@@ -27,7 +27,7 @@ async function runDownload(config) {
     : buildToolManifest(config);
   const cookie = cookieString(manifest.cookies);
 
-  if (manifest.needsDiscovery) {
+  if (manifest.needsDiscovery || manifest.needsLessonDiscovery) {
     await discoverCourse(manifest, config.retry);
   }
 

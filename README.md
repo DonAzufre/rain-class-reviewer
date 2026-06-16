@@ -41,13 +41,16 @@ Node.js ≥ 18 即可运行，无需浏览器自动化。
 
 ### 工具模式
 
-提供课程名和 Cookie，工具自动完成后续步骤。Cookie 可以是文件路径、JSON 字符串或从 stdin 读取：
+提供课程名和 Cookie，工具自动完成后续步骤。Cookie 可以是文件路径或 JSON 字符串：
 
 ```bash
 node src/index.js --course "工程伦理概论" --cookies ./cookies.json
 
 # 或直接把 JSON 字符串作为参数
-node src/index.js --course "工程伦理概论" --cookies '{"sessionid":"...","csrftoken":"...","uv_id":"2874","university_id":"2874","xtbz":"ykt"}'
+node src/index.js --course "工程伦理概论" --cookies '{"sessionid":"...","csrftoken":"...","uv_id":"0","university_id":"0","xtbz":"ykt"}'
+
+# 直接指定 classroomId（跳过课程名匹配）
+node src/index.js --course "工程伦理概论" --classroom-id "13522533" --cookies ./cookies.json
 ```
 
 `cookies.json` 至少包含 `sessionid`：
@@ -56,15 +59,15 @@ node src/index.js --course "工程伦理概论" --cookies '{"sessionid":"...","c
 {
   "sessionid": "...",
   "csrftoken": "...",
-  "uv_id": "2874",
-  "university_id": "2874",
+  "uv_id": "0",
+  "university_id": "0",
   "xtbz": "ykt"
 }
 ```
 
 ### Agent / Skill 模式
 
-Agent 可通过本项目的 `SKILL.md` 自动加载工作流。首次调用时，Agent 会运行 `scripts/bootstrap.js` 自动安装依赖并调用 CLI。
+Agent 可通过本项目的 `SKILL.md` 自动加载工作流。`scripts/bootstrap.js` 会优先使用预构建的 `dist/cli.cjs`（已包含 `openai` 等依赖），无需联网安装；若不存在才会自动 `npm install`。
 
 > **边界约束**：MCP 仅用于打开页面、检查/等待登录、提取 Cookie、处理复杂/模糊场景。构造出最小 Manifest 后必须停止 MCP，后续所有操作由脚本完成。
 
@@ -73,33 +76,37 @@ Skill 工作流：
 1. 询问用户课程名（或关键词）。
 2. 通过 chrome-devtools-mcp 连接浏览器并打开长江雨课堂。
 3. 检查登录状态；未登录时要求用户登录。
-4. 登录后从 DevTools Network 请求头读取 Cookie（支持 HttpOnly Cookie），构造最小 Manifest，**立即停止 MCP**。
-5. 调用 `node scripts/bootstrap.js verify-auth --manifest -` 校验登录态。
-6. 调用 `node scripts/bootstrap.js list-courses --manifest - --json` 获取课程列表。
+4. 登录后从 DevTools Network 请求头读取 Cookie（支持 HttpOnly Cookie），构造最小 Manifest 并写入 `tmp/manifest.json`，**立即停止 MCP**。
+5. 调用 `node <skill-path>/scripts/bootstrap.js verify-auth --manifest <skill-path>/tmp/manifest.json` 校验登录态。
+6. 调用 `node <skill-path>/scripts/bootstrap.js list-courses --manifest <skill-path>/tmp/manifest.json --json` 获取课程列表。
 7. 根据用户输入匹配课程；有歧义时展示候选并让用户确认 `classroomId`。
-8. 调用 `node scripts/bootstrap.js --manifest - --json` 下载课件图片。
-9. 调用 `node scripts/bootstrap.js summarize --course-dir ...` 提取 Markdown 笔记并生成 `review.md`。
+8. 使用课程列表返回的原始课程名，覆盖 `tmp/manifest.json`，调用 `node <skill-path>/scripts/bootstrap.js --manifest <skill-path>/tmp/manifest.json --output rain-class-reviewer-downloads --json` 下载课件图片。
+9. 调用 `node <skill-path>/scripts/bootstrap.js summarize --course-dir rain-class-reviewer-downloads/<课程名> ...` 提取 Markdown 笔记并生成 `review.md`。
 
 完整接口清单、Cookie 提取细节与约束见 `references/yuketang-api.md` 和 `SKILL.md`。
 
-手动使用 Manifest（可通过 stdin 避免临时文件）：
+手动使用 Manifest：
 
 ```bash
-cat <<'EOF' | node src/index.js --manifest -
+node src/index.js --manifest ./manifest.json --output rain-class-reviewer-downloads
+```
+
+最简 Manifest 示例：
+
+```json
 {
   "version": "1.0",
   "courseName": "工程伦理概论",
-  "cookies": { "sessionid": "...", "csrftoken": "...", "uv_id": "2874", "university_id": "2874", "xtbz": "ykt" }
+  "cookies": { "sessionid": "...", "csrftoken": "...", "uv_id": "0", "university_id": "0", "xtbz": "ykt" }
 }
-EOF
 ```
 
 ## 示例
 
-下载指定课程到 `downloads/`：
+下载指定课程到 `rain-class-reviewer-downloads/`（默认输出目录）：
 
 ```bash
-node src/index.js --course "算法设计与分析" --cookies ./cookies.json --output downloads
+node src/index.js --course "算法设计与分析" --cookies ./cookies.json
 ```
 
 强制重新下载：
@@ -111,25 +118,13 @@ node src/index.js --course "算法设计与分析" --cookies ./cookies.json --fo
 校验登录态：
 
 ```bash
-cat <<'EOF' | node src/index.js verify-auth --manifest -
-{
-  "version": "1.0",
-  "courseName": "算法设计与分析",
-  "cookies": { "sessionid": "...", "csrftoken": "...", "uv_id": "2874", "university_id": "2874", "xtbz": "ykt" }
-}
-EOF
+node src/index.js verify-auth --manifest ./manifest.json
 ```
 
 列出当前账号课程：
 
 ```bash
-cat <<'EOF' | node src/index.js list-courses --manifest - --json
-{
-  "version": "1.0",
-  "courseName": "算法设计与分析",
-  "cookies": { "sessionid": "...", "csrftoken": "...", "uv_id": "2874", "university_id": "2874", "xtbz": "ykt" }
-}
-EOF
+node src/index.js list-courses --manifest ./manifest.json --json
 ```
 
 输出 JSON 报告：
@@ -157,16 +152,22 @@ node src/index.js --course "算法设计与分析" --cookies ./cookies.json \
   --lesson-id 1318590613705012608
 ```
 
+直接指定 classroomId 下载：
+
+```bash
+node src/index.js --course "算法设计与分析" --classroom-id "13522533" --cookies ./cookies.json
+```
+
 生成复习大纲（下载完成后）：
 
 ```bash
 # 总结整门课程
-node src/index.js summarize --course-dir "downloads/算法设计与分析"
+node src/index.js summarize --course-dir "rain-class-reviewer-downloads/算法设计与分析"
 
 # 只总结某一节课
 node src/index.js summarize \
-  --course-dir "downloads/算法设计与分析" \
-  --lesson-dir "downloads/算法设计与分析/2024-12-24_1318590613705012608_5.2 贪心法正确性证明（2）"
+  --course-dir "rain-class-reviewer-downloads/算法设计与分析" \
+  --lesson-dir "rain-class-reviewer-downloads/算法设计与分析/2024-12-24_1318590613705012608_5.2 贪心法正确性证明（2）"
 ```
 
 ## 文档
@@ -186,5 +187,5 @@ node src/index.js summarize \
 命令预览：
 
 ```bash
-node src/index.js summarize --course-dir "./工程伦理概论" --model mimo-v2.5
+node src/index.js summarize --course-dir "rain-class-reviewer-downloads/工程伦理概论" --model mimo-v2.5
 ```

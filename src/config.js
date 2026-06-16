@@ -4,12 +4,13 @@ import path from 'node:path';
 const DEFAULTS = {
   // 下载模式
   manifest: process.env.RAIN_MANIFEST || undefined,
-  output: process.env.RAIN_OUTPUT || 'downloads',
+  output: process.env.RAIN_OUTPUT || 'rain-class-reviewer-downloads',
   concurrency: parseInt(process.env.RAIN_CONCURRENCY, 10) || 3,
   retry: parseInt(process.env.RAIN_RETRY, 10) || 3,
   force: false,
   json: false,
   course: process.env.RAIN_COURSE || undefined,
+  classroomId: process.env.RAIN_CLASSROOM_ID || undefined,
   cookies: process.env.RAIN_COOKIES || undefined,
 
   // 课时过滤
@@ -80,6 +81,9 @@ function parseArgs(argv) {
       case '--course':
         config.course = args[++i];
         break;
+      case '--classroom-id':
+        config.classroomId = args[++i];
+        break;
       case '--cookies':
         config.cookies = args[++i];
         break;
@@ -146,12 +150,13 @@ function showHelp() {
 
 下载选项:
   -m, --manifest <path>      Manifest JSON 文件路径，使用 - 从 stdin 读取
-  -o, --output <dir>         输出根目录 (默认: downloads)
+  -o, --output <dir>         输出根目录 (默认: rain-class-reviewer-downloads)
   -c, --concurrency <n>      并发下载数 (默认: 3)
   -r, --retry <n>            单张图片失败重试次数 (默认: 3)
   -f, --force                强制重新下载已存在课时
   -j, --json                 输出 JSON 结果
   --course <name>            工具模式：按课程名严格匹配并自动发现
+  --classroom-id <id>        工具模式：直接指定 classroomId（可配合 --course 使用）
   --cookies <path|->         工具模式：Cookie JSON 文件路径，使用 - 从 stdin 读取，或直接传入 JSON 字符串
   --since <date>             只下载该日期及之后的课时 (YYYY-MM-DD)
   --until <date>             只下载该日期及之前的课时 (YYYY-MM-DD)
@@ -172,7 +177,7 @@ function showHelp() {
 
 环境变量:
   RAIN_MANIFEST, RAIN_OUTPUT, RAIN_CONCURRENCY, RAIN_RETRY
-  RAIN_COURSE, RAIN_COOKIES
+  RAIN_COURSE, RAIN_CLASSROOM_ID, RAIN_COOKIES
   RAIN_SINCE, RAIN_UNTIL, RAIN_LATEST, RAIN_LESSON_ID, RAIN_LESSON_DATE
   RAIN_COURSE_DIR, RAIN_LESSON_DIR, RAIN_MODEL, RAIN_EXTRACT_MODEL
   RAIN_EXTRACT_CONCURRENCY, RAIN_API_KEY

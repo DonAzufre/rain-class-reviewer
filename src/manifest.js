@@ -70,8 +70,19 @@ export function validateAndNormalize(manifest) {
   const hasClassroomId = Boolean(manifest.classroomId);
 
   if (!hasClassroomId && !hasLessons) {
-    // 允许只提供 courseName，由工具自动发现 classroomId 和 lessons
+    // 只提供 courseName：自动发现 classroomId 和 lessons
     manifest.needsDiscovery = true;
+    manifest.needsLessonDiscovery = false;
+    manifest.lessons = [];
+    manifest.headers = manifest.headers || {};
+    manifest.extractedAt = manifest.extractedAt || new Date().toISOString();
+    return manifest;
+  }
+
+  if (hasClassroomId && !hasLessons) {
+    // 提供了 classroomId 但没有 lessons：自动拉取课时列表
+    manifest.needsDiscovery = false;
+    manifest.needsLessonDiscovery = true;
     manifest.lessons = [];
     manifest.headers = manifest.headers || {};
     manifest.extractedAt = manifest.extractedAt || new Date().toISOString();
@@ -83,10 +94,11 @@ export function validateAndNormalize(manifest) {
   }
 
   if (!hasLessons) {
-    throw new Error('Manifest 缺少 lessons 数组或数组为空（或移除 classroomId 以启用自动发现）');
+    throw new Error('Manifest 缺少 lessons 数组或数组为空');
   }
 
   manifest.needsDiscovery = false;
+  manifest.needsLessonDiscovery = false;
 
   for (const lesson of manifest.lessons) {
     if (!lesson.lessonId) {
